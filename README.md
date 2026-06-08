@@ -61,20 +61,62 @@ HTTP (streamable transport) at `POST /mcp`, live whenever the service is running
 Most inexpensive 80mm and 58mm USB receipt printers are ESC/POS and Epson-compatible. To add one, put a **Model** (USB vendor/product ID and/or a name substring) in the allowlist in
 [`internal/printer/printer.go`](internal/printer/printer.go). The print path is already shared across models.
 
-## Quick start
+## Install
+
+Prebuilt binaries and packages for each release are on the
+[Releases page](https://github.com/aphexddb/shortorder/releases/latest). Download
+the file for your platform, or use the commands below. The commands use the
+[GitHub CLI](https://cli.github.com) (`gh`), which resolves the latest version
+and its filenames for you; if you do not have `gh`, just download the file from
+the releases page instead.
+
+### Linux and Raspberry Pi (package)
+
+On a Raspberry Pi or any systemd Linux box this is the easiest option. The
+package installs a service that starts on boot and restarts on failure. Use the
+arm64 build for a Raspberry Pi and amd64 for a typical x86 machine.
 
 ```sh
-# Build a single static binary into ./bin
-make build        # or: CGO_ENABLED=0 go build -o bin/shortorder ./cmd/shortorder
-
-# See what's detected
-./bin/shortorder -list
-
-# Run the service
-./bin/shortorder
+# Debian, Ubuntu, Raspberry Pi OS
+gh release download -R aphexddb/shortorder -p '*_linux_arm64.deb'
+sudo dpkg -i shortorder_*_linux_arm64.deb
 ```
 
-Open the web UI in a browser. It lists connected devices, runs test prints, and documents the API.
+`.rpm` (Fedora, RHEL) and `.apk` (Alpine) packages are published too. The service
+serves the web UI and API on port 80. See
+[Deploy on a Raspberry Pi](#deploy-on-a-raspberry-pi-debian-package) for managing
+it.
+
+### Linux or macOS (tarball)
+
+```sh
+gh release download -R aphexddb/shortorder -p '*_linux_amd64.tar.gz'
+tar -xzf shortorder_*_linux_amd64.tar.gz
+./shortorder
+```
+
+On macOS use the `darwin_arm64` (Apple Silicon) or `darwin_amd64` (Intel)
+tarball.
+
+### Windows
+
+Download `shortorder_<version>_windows_amd64.zip` from the
+[Releases page](https://github.com/aphexddb/shortorder/releases/latest), unzip
+it, and run `shortorder.exe`. It listens on <http://localhost:8080/>.
+
+### Verify a download (optional)
+
+Every release ships a `checksums.txt`:
+
+```sh
+gh release download -R aphexddb/shortorder -p 'checksums.txt'
+sha256sum -c checksums.txt --ignore-missing
+```
+
+## Using it
+
+Once it's running, open the web UI in a browser. It lists connected devices, runs
+test prints, and documents the API.
 
 - Linux and macOS: <http://localhost/>
 - Windows: <http://localhost:8080/>
@@ -95,6 +137,21 @@ curl -X POST http://localhost/api/print/qr \
 # Any PNG, JPEG, or GIF, scaled to fit and dithered
 curl -X POST 'http://localhost/api/print/image?align=center' \
   --data-binary @logo.png -H 'Content-Type: application/octet-stream'
+```
+
+## Build from source
+
+Requires Go 1.26 or newer.
+
+```sh
+# Build a single static binary into ./bin
+make build        # or: CGO_ENABLED=0 go build -o bin/shortorder ./cmd/shortorder
+
+# See what's detected
+./bin/shortorder -list
+
+# Run the service
+./bin/shortorder
 ```
 
 ## Configuration
@@ -179,7 +236,7 @@ the same across printers regardless of their native graphics support.
 
 Every request is logged as one structured line with method, path, status, size, duration, client, and outcome. The level follows the result (`INFO` for 2xx and 3xx, `WARN` for 4xx, `ERROR` for 5xx), so invalid commands and print failures stand out.
 
-## Building releases
+## Cutting a release (maintainers)
 
 [GoReleaser](https://goreleaser.com) builds the full matrix (linux, windows, and darwin, for amd64 and arm64) plus the Linux packages:
 
