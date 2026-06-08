@@ -81,5 +81,5 @@ release:
   github:
     owner: aphexddb
     name: shortorder
-  draft: true
+  draft: false # publish immediately on tag (visible on /releases)
   prerelease: auto
