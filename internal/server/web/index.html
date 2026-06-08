@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shortorder</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #98a0b3; --accent: #5eead4; --accent2: #60a5fa;
+    --ok: #34d399; --warn: #fbbf24; --err: #f87171; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 18px 26px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+  header h1 .tilde { color: var(--accent); }
+  .pill {
+    font: 12px/1 var(--mono); padding: 5px 9px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); background: var(--panel2);
+  }
+  .pill.live { color: var(--ok); border-color: #1f5f4d; }
+  .pill.down { color: var(--err); border-color: #5f1f1f; }
+  .ver { margin-left: auto; color: var(--muted); font: 12px/1 var(--mono); }
+  main { max-width: 980px; margin: 0 auto; padding: 26px; }
+  section { margin-bottom: 30px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .devices { display: grid; gap: 14px; }
+  .device { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; }
+  .device .name { font-weight: 600; font-size: 17px; }
+  .device .model { color: var(--accent); font: 13px/1 var(--mono); }
+  .device dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 8px 0 0; grid-column: 1 / -1; }
+  .device dt { color: var(--muted); font-size: 13px; }
+  .device dd { margin: 0; font: 13px/1.4 var(--mono); word-break: break-all; }
+  .badge { font: 12px/1 var(--mono); padding: 5px 10px; border-radius: 8px; background: #133a32; color: var(--ok); border: 1px solid #1f5f4d; height: max-content; }
+  .empty { color: var(--muted); }
+  .supported { margin-top: 12px; color: var(--muted); font-size: 13px; }
+  .supported code { color: var(--accent); }
+
+  /* try-it panel */
+  .tryit { display: grid; gap: 12px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  input[type=text], textarea {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 9px 11px; font: 14px var(--mono); flex: 1; min-width: 220px;
+  }
+  textarea { width: 100%; min-height: 64px; resize: vertical; }
+  button {
+    background: var(--accent2); color: #0a0e17; border: 0; border-radius: 8px;
+    padding: 9px 16px; font-weight: 600; cursor: pointer; font-size: 14px;
+  }
+  button.alt { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: default; }
+  label.inline { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  #result { font: 12px/1.5 var(--mono); padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; display: none; }
+  #result.ok { display: block; background: #102a22; color: var(--ok); border: 1px solid #1f5f4d; }
+  #result.err { display: block; background: #2a1414; color: var(--err); border: 1px solid #5f1f1f; }
+
+  /* api docs */
+  .ep { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ep summary { cursor: pointer; padding: 12px 16px; display: flex; gap: 12px; align-items: center; background: var(--panel); list-style: none; }
+  .ep summary::-webkit-details-marker { display: none; }
+  .ep[open] summary { border-bottom: 1px solid var(--border); }
+  .method { font: 12px/1 var(--mono); font-weight: 700; padding: 4px 8px; border-radius: 6px; min-width: 52px; text-align: center; }
+  .method.get { background: #14304a; color: var(--accent2); }
+  .method.post { background: #143a2c; color: var(--ok); }
+  .ep .path { font: 14px var(--mono); }
+  .ep .desc { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .ep .body { padding: 16px; background: var(--panel2); }
+  .ep table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 13px; }
+  .ep th, .ep td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .ep th { color: var(--muted); font-weight: 600; }
+  .ep td:first-child { font: 13px var(--mono); color: var(--accent); white-space: nowrap; }
+  pre { background: #0a0d13; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 0; }
+  pre code { font: 12.5px/1.6 var(--mono); color: #cdd6e6; }
+  .copy { float: right; font-size: 11px; padding: 3px 8px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; }
+  a { color: var(--accent2); }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="tilde">~</span> shortorder</h1>
+  <span id="status" class="pill">checking…</span>
+  <span class="ver" id="version"></span>
+</header>
+
+<main>
+  <section>
+    <h2>Connected devices <span id="refresh" style="font:11px var(--mono);color:var(--muted);text-transform:none;letter-spacing:0;"></span></h2>
+    <div class="card">
+      <div id="devices" class="devices"><span class="empty">Loading…</span></div>
+      <div class="supported" id="supported"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Try it</h2>
+    <div class="card tryit">
+      <div class="row">
+        <input id="text-input" type="text" placeholder="Text to print…" value="Hello from shortorder!">
+        <label class="inline"><input id="text-cut" type="checkbox" checked> cut</label>
+        <button id="btn-text">Print text</button>
+      </div>
+      <div class="row">
+        <input id="qr-input" type="text" placeholder="QR data / URL…" value="https://github.com/aphexddb/shortorder">
+        <button id="btn-qr">Print QR</button>
+        <button class="alt" id="btn-cut">Cut only</button>
+      </div>
+      <div id="result"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API reference</h2>
+    <div id="api"></div>
+  </section>
+</main>
+
+<footer>shortorder — POST a command, it prints. See <a href="https://github.com/aphexddb/shortorder">README</a> for details.</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const base = location.origin;
+
+async function refreshHealth() {
+  try {
+    const r = await fetch(base + "/healthz");
+    const j = await r.json();
+    $("#status").className = "pill live";
+    $("#status").textContent = "● online";
+    $("#version").textContent = "version " + (j.version || "?");
+  } catch (e) {
+    $("#status").className = "pill down";
+    $("#status").textContent = "● offline";
+  }
+}
+
+function deviceCard(d) {
+  return `<div class="device">
+    <div>
+      <div class="name">${esc(d.name)}</div>
+      <div class="model">${esc(d.model)}</div>
+    </div>
+    <span class="badge">USB · connected</span>
+    <dl>
+      <dt>USB ID</dt><dd>${esc(d.usb || "—")}</dd>
+      <dt>Device path</dt><dd>${esc(d.path || "—")}</dd>
+    </dl>
+  </div>`;
+}
+
+async function refreshDevices() {
+  try {
+    const r = await fetch(base + "/api/printers");
+    const j = await r.json();
+    const dev = $("#devices");
+    if (!j.detected || j.detected.length === 0) {
+      dev.innerHTML = `<span class="empty">No supported printer detected. Connect one and it will appear here.</span>`;
+    } else {
+      dev.innerHTML = j.detected.map(deviceCard).join("");
+    }
+    $("#supported").innerHTML = "Supported models: " +
+      (j.supported || []).map((m) => `<code>${esc(m)}</code>`).join(", ");
+    const t = new Date().toLocaleTimeString();
+    $("#refresh").textContent = "· updated " + t;
+  } catch (e) {
+    $("#devices").innerHTML = `<span class="empty">Failed to reach the service.</span>`;
+  }
+}
+
+function showResult(ok, obj) {
+  const el = $("#result");
+  el.className = ok ? "ok" : "err";
+  el.textContent = (ok ? "✓ " : "✗ ") + JSON.stringify(obj, null, 2);
+}
+
+async function post(path, body, opts = {}) {
+  const init = { method: "POST" };
+  if (body !== undefined) {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify(body);
+  }
+  const btns = document.querySelectorAll("button");
+  btns.forEach((b) => (b.disabled = true));
+  try {
+    const r = await fetch(base + path, init);
+    const j = await r.json();
+    showResult(r.ok, j);
+  } catch (e) {
+    showResult(false, { error: String(e) });
+  } finally {
+    btns.forEach((b) => (b.disabled = false));
+    refreshDevices();
+  }
+}
+
+$("#btn-text").onclick = () =>
+  post("/api/print/text", { text: $("#text-input").value, align: "center", cut: $("#text-cut").checked });
+$("#btn-qr").onclick = () =>
+  post("/api/print/qr", { data: $("#qr-input").value, caption: "shortorder", cut: true });
+$("#btn-cut").onclick = () => post("/api/cut");
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---- API reference data ----
+const endpoints = [
+  { m: "GET", p: "/healthz", d: "Liveness + version",
+    ex: `curl ${base}/healthz` },
+  { m: "GET", p: "/api/printers", d: "List supported models and detected devices",
+    ex: `curl ${base}/api/printers` },
+  { m: "POST", p: "/api/print/text", d: "Print formatted text",
+    params: [
+      ["text", "string", "required", "Text to print. \\n for line breaks."],
+      ["align", "string", "left", "left | center | right"],
+      ["bold", "bool", "false", "Emphasized printing"],
+      ["underline", "int", "0", "0 off, 1 thin, 2 thick"],
+      ["width", "int", "1", "Char width magnification 1–8"],
+      ["height", "int", "1", "Char height magnification 1–8"],
+      ["feed", "int", "0", "Extra blank lines after text"],
+      ["cut", "bool", "true", "Cut after printing"],
+    ],
+    ex: `curl -X POST ${base}/api/print/text \\
+  -H 'Content-Type: application/json' \\
+  -d '{"text":"ORDER #42","align":"center","width":2,"height":2,"cut":true}'` },
+  { m: "POST", p: "/api/print/qr", d: "Render and print a QR code",
+    params: [
+      ["data", "string", "required", "Text / URL to encode"],
+      ["scale", "int", "8", "Module pixel size (~6–10)"],
+      ["recovery", "string", "medium", "low | medium | high | highest"],
+      ["align", "string", "center", "left | center | right"],
+      ["caption", "string", "—", "Text printed under the code"],
+      ["cut", "bool", "true", "Cut after printing"],
+    ],
+    ex: `curl -X POST ${base}/api/print/qr \\
+  -H 'Content-Type: application/json' \\
+  -d '{"data":"https://example.com","scale":8,"caption":"scan me"}'` },
+  { m: "POST", p: "/api/print/image", d: "Print a PNG/JPEG/GIF as a dithered raster",
+    note: "Send the image as the raw request body (Content-Type: application/octet-stream) with ?cut= & ?align= query params, or as JSON { image_base64, align, cut }. Images wider than the head are scaled to fit.",
+    ex: `curl -X POST '${base}/api/print/image?align=center&cut=true' \\
+  --data-binary @logo.png -H 'Content-Type: application/octet-stream'` },
+  { m: "POST", p: "/api/print/raw", d: "Send a raw ESC/POS byte stream",
+    note: "Raw body (application/octet-stream) sent verbatim, or JSON { bytes: \"<base64>\" }.",
+    ex: `printf '\\x1b@Hi\\n\\x1bd\\x03\\x1dV\\x42\\x00' | \\
+  curl -X POST ${base}/api/print/raw \\
+  --data-binary @- -H 'Content-Type: application/octet-stream'` },
+  { m: "POST", p: "/api/cut", d: "Feed and partial cut (no body)",
+    ex: `curl -X POST ${base}/api/cut` },
+];
+
+function renderAPI() {
+  $("#api").innerHTML = endpoints.map((e) => {
+    const params = e.params ? `<table>
+      <tr><th>Field</th><th>Type</th><th>Default</th><th>Notes</th></tr>
+      ${e.params.map((p) => `<tr><td>${esc(p[0])}</td><td>${esc(p[1])}</td><td>${esc(p[2])}</td><td>${esc(p[3])}</td></tr>`).join("")}
+    </table>` : "";
+    const note = e.note ? `<p style="color:var(--muted);font-size:13px;margin:0 0 12px;">${esc(e.note)}</p>` : "";
+    return `<details class="ep">
+      <summary>
+        <span class="method ${e.m.toLowerCase()}">${e.m}</span>
+        <span class="path">${esc(e.p)}</span>
+        <span class="desc">${esc(e.d)}</span>
+      </summary>
+      <div class="body">
+        ${params}${note}
+        <pre><button class="copy" onclick="copyEx(this)">copy</button><code>${esc(e.ex)}</code></pre>
+      </div>
+    </details>`;
+  }).join("");
+}
+
+function copyEx(btn) {
+  const code = btn.parentElement.querySelector("code");
+  navigator.clipboard.writeText(code.textContent).then(() => {
+    btn.textContent = "copied!";
+    setTimeout(() => (btn.textContent = "copy"), 1200);
+  });
+}
+
+renderAPI();
+refreshHealth();
+refreshDevices();
+setInterval(refreshDevices, 4000);
+setInterval(refreshHealth, 8000);
+</script>
+</body>
+</html>

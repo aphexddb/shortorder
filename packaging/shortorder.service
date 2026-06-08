@@ -1,0 +1,21 @@
+[Unit]
+Description=shortorder thermal receipt printer service
+Documentation=https://github.com/aphexddb/shortorder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/shortorder
+Restart=on-failure
+RestartSec=3
+# Runs as root so it can open the USB printer character device (/dev/usb/lp0)
+# and bind the privileged HTTP port 80 out of the box on a Raspberry Pi.
+# Tighten to a dedicated user in the `lp` group + a high port if you prefer.
+User=root
+# Override the listen address or force a printer by dropping an env file at
+# /etc/default/shortorder, e.g.:  SHORTORDER_ADDR=:8080
+EnvironmentFile=-/etc/default/shortorder
+
+[Install]
+WantedBy=multi-user.target

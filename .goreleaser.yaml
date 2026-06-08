@@ -1,0 +1,85 @@
+# GoReleaser config — build and package shortorder for every platform.
+# Local dry run (no publish, full matrix in ./dist):  goreleaser release --snapshot --clean
+# Validate this file:                                  goreleaser check
+# Real release (CI does this on a git tag):            goreleaser release --clean
+version: 2
+
+project_name: shortorder
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: shortorder
+    main: ./cmd/shortorder
+    binary: shortorder
+    env:
+      - CGO_ENABLED=0 # pure Go: fully static, no cross-toolchains needed
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}" # reproducible builds
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - docs/*
+
+checksum:
+  name_template: checksums.txt
+
+# Linux system packages. The Raspberry Pi target is the arm64 .deb: it installs
+# the binary to /usr/bin, ships the systemd unit, and enables + starts the
+# service on install (see packaging/postinstall.sh, which also sets the Pi's
+# hostname to "shortorder").
+nfpms:
+  - id: linux-packages
+    package_name: shortorder
+    vendor: shortorder
+    homepage: https://github.com/aphexddb/shortorder
+    maintainer: Gardiner <aphexddb@gmail.com>
+    description: shortorder — a tiny HTTP service that prints text, QR codes, and images to a USB thermal receipt printer and cuts the receipt.
+    license: Apache-2.0
+    formats: [deb, rpm, apk]
+    bindir: /usr/bin
+    contents:
+      - src: packaging/shortorder.service
+        dst: /lib/systemd/system/shortorder.service
+    scripts:
+      postinstall: packaging/postinstall.sh
+      preremove: packaging/preremove.sh
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  # Set explicitly so a release works before an "origin" remote is configured.
+  # Adjust owner/name to match the actual GitHub repo you push to.
+  github:
+    owner: aphexddb
+    name: shortorder
+  draft: true
+  prerelease: auto
