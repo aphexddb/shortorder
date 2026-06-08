@@ -123,3 +123,38 @@ Feed a few lines clear of the head and perform a partial cut. No body.
 ```sh
 curl -X POST http://127.0.0.1:8080/api/cut
 ```
+
+---
+
+## Agent discovery
+
+### `GET /openapi.json` · `GET /.well-known/openapi.json`
+
+Returns an OpenAPI 3.1 description of this API for function-calling agents and
+tool loaders. The `servers[0].url` is filled in from the request host.
+
+### `POST /mcp`
+
+A [Model Context Protocol](https://modelcontextprotocol.io) server over the HTTP
+streamable transport (stateless). Exposes the tools `list_printers`,
+`print_text`, `print_qr`, `print_image`, and `cut`. Example (JSON-RPC):
+
+```sh
+curl -X POST http://127.0.0.1:8080/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+The same MCP server runs over **stdio** via `shortorder mcp`, for agents that
+launch tools as a subprocess:
+
+```jsonc
+{ "mcpServers": { "shortorder": { "command": "shortorder", "args": ["mcp"] } } }
+```
+
+### mDNS / DNS-SD
+
+When running, the service advertises `_shortorder._tcp` on the local network with
+TXT records `version`, `path=/`, `api=/api`, `mcp=/mcp`, `openapi=/openapi.json`.
+Browse with `dns-sd -B _shortorder._tcp` or `avahi-browse _shortorder._tcp`.

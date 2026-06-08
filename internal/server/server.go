@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	mcpserver "github.com/mark3labs/mcp-go/server"
 	qrcode "github.com/skip2/go-qrcode"
 
 	"shortorder/internal/escpos"
@@ -63,6 +64,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/print/image", s.handleImage)
 	mux.HandleFunc("POST /api/print/raw", s.handleRaw)
 	mux.HandleFunc("POST /api/cut", s.handleCut)
+
+	// Agent discovery: a machine-readable OpenAPI descriptor...
+	mux.HandleFunc("GET /openapi.json", s.handleOpenAPI)
+	mux.HandleFunc("GET /.well-known/openapi.json", s.handleOpenAPI)
+
+	// ...and an MCP server over the HTTP streamable transport. Stateless mode
+	// keeps each request self-contained (no session bookkeeping), which suits a
+	// simple tool server and any number of concurrent agents.
+	mcpHTTP := mcpserver.NewStreamableHTTPServer(s.MCPServer(),
+		mcpserver.WithStateLess(true),
+		mcpserver.WithEndpointPath("/mcp"),
+	)
+	mux.Handle("/mcp", mcpHTTP)
+
 	return s.withLogging(mux)
 }
 
@@ -148,7 +163,12 @@ func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, fmt.Errorf("text is required"))
 		return
 	}
+	s.dispatch(w, "shortorder-text", buildText(req))
+}
 
+// buildText renders a text job to ESC/POS. Pure (no I/O) so both the HTTP
+// handler and the MCP tool share exactly one code path.
+func buildText(req textRequest) []byte {
 	b := escpos.New()
 	b.Align(parseAlign(req.Align))
 	if req.Width > 0 || req.Height > 0 {
@@ -168,8 +188,7 @@ func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
 	if cutOrDefault(req.Cut) {
 		b.Cut()
 	}
-
-	s.dispatch(w, "shortorder-text", b.Bytes())
+	return b.Bytes()
 }
 
 // qrRequest is the body for POST /api/print/qr.
@@ -191,13 +210,21 @@ func (s *Server) handleQR(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, fmt.Errorf("data is required"))
 		return
 	}
-
-	img, err := escpos.QRImage(req.Data, req.Scale, parseRecovery(req.Recovery))
+	data, err := buildQR(req, s.cfg.Width)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, fmt.Errorf("render qr: %w", err))
+		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	img = escpos.FitWidth(img, s.cfg.Width)
+	s.dispatch(w, "shortorder-qr", data)
+}
+
+// buildQR renders a QR job to ESC/POS at the given head width.
+func buildQR(req qrRequest, width int) ([]byte, error) {
+	img, err := escpos.QRImage(req.Data, req.Scale, parseRecovery(req.Recovery))
+	if err != nil {
+		return nil, fmt.Errorf("render qr: %w", err)
+	}
+	img = escpos.FitWidth(img, width)
 
 	b := escpos.New()
 	b.Align(parseAlignDefault(req.Align, escpos.AlignCenter))
@@ -209,8 +236,7 @@ func (s *Server) handleQR(w http.ResponseWriter, r *http.Request) {
 	if cutOrDefault(req.Cut) {
 		b.Cut()
 	}
-
-	s.dispatch(w, "shortorder-qr", b.Bytes())
+	return b.Bytes(), nil
 }
 
 func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
@@ -219,8 +245,13 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	img = escpos.FitWidth(img, s.cfg.Width)
+	s.dispatch(w, "shortorder-image", buildImageRaster(img, s.cfg.Width, align, cut))
+}
 
+// buildImageRaster renders an already-decoded image to ESC/POS, scaled to fit
+// the head width.
+func buildImageRaster(img image.Image, width int, align escpos.Align, cut bool) []byte {
+	img = escpos.FitWidth(img, width)
 	b := escpos.New()
 	b.Align(align)
 	b.Image(img)
@@ -228,7 +259,7 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	if cut {
 		b.Cut()
 	}
-	s.dispatch(w, "shortorder-image", b.Bytes())
+	return b.Bytes()
 }
 
 // rawRequest carries a base64-encoded ESC/POS stream.
@@ -312,6 +343,14 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 	n, err := r.ResponseWriter.Write(b)
 	r.size += n
 	return n, err
+}
+
+// Flush forwards to the underlying ResponseWriter when it supports streaming
+// (Server-Sent Events), as the MCP streamable-HTTP transport may use.
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // setNote attaches a short outcome string to the current request's log line.

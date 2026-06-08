@@ -40,6 +40,10 @@
   .device dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 8px 0 0; grid-column: 1 / -1; }
   .device dt { color: var(--muted); font-size: 13px; }
   .device dd { margin: 0; font: 13px/1.4 var(--mono); word-break: break-all; }
+  dl.agents { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; margin: 0; }
+  dl.agents dt { color: var(--muted); font-size: 13px; }
+  dl.agents dd { margin: 0; font: 13px/1.4 var(--mono); }
+  dl.agents code { color: var(--accent); }
   .badge { font: 12px/1 var(--mono); padding: 5px 10px; border-radius: 8px; background: #133a32; color: var(--ok); border: 1px solid #1f5f4d; height: max-content; }
   .empty { color: var(--muted); }
   .supported { margin-top: 12px; color: var(--muted); font-size: 13px; }
@@ -117,6 +121,19 @@
         <button class="alt" id="btn-cut">Cut only</button>
       </div>
       <div id="result"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>For agents 🤖</h2>
+    <div class="card">
+      <dl class="agents">
+        <dt>MCP (HTTP)</dt><dd id="mcp-http"></dd>
+        <dt>MCP (stdio)</dt><dd><code>shortorder mcp</code></dd>
+        <dt>OpenAPI</dt><dd><a id="openapi-link" href="/openapi.json"><span id="openapi-url"></span></a></dd>
+        <dt>mDNS / DNS-SD</dt><dd><code>_shortorder._tcp</code> &nbsp;(<code>dns-sd -B _shortorder._tcp</code>)</dd>
+      </dl>
+      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_qr</code>, <code>print_image</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
     </div>
   </section>
 
@@ -287,6 +304,10 @@ function copyEx(btn) {
     setTimeout(() => (btn.textContent = "copy"), 1200);
   });
 }
+
+// populate agent-discovery URLs from the current origin
+$("#mcp-http").innerHTML = `<code>POST ${esc(base)}/mcp</code>`;
+$("#openapi-url").textContent = base + "/openapi.json";
 
 renderAPI();
 refreshHealth();

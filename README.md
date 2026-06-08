@@ -128,12 +128,37 @@ curl -X POST 'http://localhost/api/print/image?align=center' \
 | `POST /api/print/image` | Print a PNG/JPEG/GIF as a dithered raster      |
 | `POST /api/print/raw`   | Send a raw ESC/POS byte stream                 |
 | `POST /api/cut`         | Feed and cut                                   |
+| `GET  /openapi.json`    | OpenAPI 3.1 descriptor (also `/.well-known/openapi.json`) |
+| `POST /mcp`             | MCP server (HTTP streamable transport)         |
 
 📖 **Full request/response reference:** [docs/API.md](docs/API.md).
 
 > 💡 For crisp receipt text use `/api/print/text` (the printer's native font).
 > Image mode rasterizes at the head's dot density, so keep any text inside an
 > image generously sized or it can print faint.
+
+## 🤖 Discovery for AI agents
+
+shortorder is built to be **discovered and used by agents** with zero glue code,
+at three levels:
+
+- **MCP server** — exposes the printer as [Model Context Protocol](https://modelcontextprotocol.io)
+  tools: `list_printers`, `print_text`, `print_qr`, `print_image`, `cut`. Any
+  MCP-aware agent gets the typed tool schemas automatically. Two transports:
+  - **stdio** (for agents that launch a subprocess):
+    ```jsonc
+    // e.g. claude_desktop_config.json / any MCP client
+    { "mcpServers": { "shortorder": { "command": "shortorder", "args": ["mcp"] } } }
+    ```
+  - **HTTP** (streamable transport) at `POST /mcp` — already live whenever the
+    service is running.
+- **OpenAPI 3.1** at `/openapi.json` (and `/.well-known/openapi.json`) — for
+  function-calling agents and tool loaders (LangChain, LlamaIndex, codegen) that
+  import an OpenAPI spec.
+- **mDNS / DNS-SD** — advertises `_shortorder._tcp` on the LAN with TXT records
+  (`version`, `path`, `api`, `mcp`, `openapi`), so an agent finds the box with no
+  IP configuration. Browse it with `dns-sd -B _shortorder._tcp` or
+  `avahi-browse _shortorder._tcp`.
 
 ## 🍓 Deploy on a Raspberry Pi (Debian package)
 
@@ -212,9 +237,11 @@ ESC/POS USB receipt printers. Adding a model is a one-line allowlist change.
 Raspberry Pi). The binary also builds and runs on macOS, where the print path is
 a stub pending a CUPS backend.
 
-**Can an AI agent or LLM use this?** Yes — that's a primary use case. It's a
-plain REST API, so any agent that can make an HTTP POST can print text, QR codes,
-or images in the physical world.
+**Can an AI agent or LLM use this?** Yes — that's a primary use case. It ships an
+**MCP server** (stdio + HTTP) so MCP-aware agents auto-discover typed print
+tools, an **OpenAPI** spec for function-calling agents, and **mDNS** so agents
+find it on the LAN. Or just POST the plain REST API. See
+[Discovery for AI agents](#-discovery-for-ai-agents).
 
 **Does it phone home or need the internet?** No. It's a fully local service.
 

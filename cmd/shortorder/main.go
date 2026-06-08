@@ -9,12 +9,16 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/grandcat/zeroconf"
 
 	"shortorder/internal/printer"
 	"shortorder/internal/server"
@@ -28,6 +32,14 @@ var (
 )
 
 func main() {
+	// Subcommand: `shortorder mcp` runs the MCP server over stdio (for agents
+	// that launch tools as a subprocess). The protocol owns stdout, so logs go
+	// to stderr only.
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		runStdioMCP()
+		return
+	}
+
 	var (
 		addr        = flag.String("addr", envOr("SHORTORDER_ADDR", defaultAddr()), "HTTP listen address")
 		printerName = flag.String("printer", os.Getenv("SHORTORDER_PRINTER"), "force a specific printer queue name (default: first detected supported printer)")
@@ -78,6 +90,15 @@ func main() {
 		}
 	}
 
+	// Advertise over mDNS / DNS-SD so agents on the LAN can discover the service
+	// without knowing its IP (best-effort — never fatal).
+	if mdns, err := advertiseMDNS(*addr, version); err != nil {
+		log.Warn("mDNS advertisement unavailable", "err", err)
+	} else if mdns != nil {
+		defer mdns.Shutdown()
+		log.Info("advertising over mDNS", "service", mdnsService, "instance", mdnsInstance)
+	}
+
 	// Graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -113,6 +134,48 @@ func listPrinters(log *slog.Logger) {
 	for _, p := range found {
 		fmt.Printf("  - %-28s model=%-22s usb=%s\n", p.Name, p.Model, p.USB)
 	}
+}
+
+const (
+	mdnsService  = "_shortorder._tcp"
+	mdnsInstance = "shortorder"
+)
+
+// runStdioMCP serves the MCP tool server over stdio and blocks until stdin
+// closes. Used by `shortorder mcp`.
+func runStdioMCP() {
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	srv := server.New(server.Config{
+		PrinterName: os.Getenv("SHORTORDER_PRINTER"),
+		Width:       envInt("SHORTORDER_WIDTH", 576),
+		Version:     version,
+	}, log)
+	if err := srv.ServeStdioMCP(); err != nil {
+		log.Error("mcp stdio server error", "err", err)
+		os.Exit(1)
+	}
+}
+
+// advertiseMDNS registers the service over multicast DNS as _shortorder._tcp,
+// with TXT metadata pointing agents at the web UI, JSON API, MCP endpoint, and
+// OpenAPI descriptor.
+func advertiseMDNS(addr, version string) (*zeroconf.Server, error) {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("parse listen address %q: %w", addr, err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse port %q: %w", portStr, err)
+	}
+	txt := []string{
+		"version=" + version,
+		"path=/",
+		"api=/api",
+		"mcp=/mcp",
+		"openapi=/openapi.json",
+	}
+	return zeroconf.Register(mdnsInstance, mdnsService, "local.", port, txt, nil)
 }
 
 // defaultAddr is :80 everywhere except Windows, where binding 80 commonly
