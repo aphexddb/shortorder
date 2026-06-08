@@ -1,8 +1,10 @@
 # 🧾 shortorder
 
-**A tiny HTTP service that prints to a USB thermal receipt printer.** Send it an
-HTTP request and it prints — plain text, QR codes, or any image — then cuts the
-receipt. One static Go binary, no dependencies, no print drivers, no cloud.
+**A tiny service that prints to a USB thermal receipt printer.** 
+
+shortorder is an AI-enabled thermal receipt printer. It runs as a small HTTP service that lets AI agents (and ordinary scripts) print to a USB thermal printer. Send it a request and it prints text, QR codes, or images, then cuts the receipt.
+
+It ships an MCP server, so an LLM agent can discover the printer and use it as a tool without writing an integration. There's also a plain REST API for everything else. It's a single Go binary with no dependencies, no printer drivers, and no cloud, and it runs on Windows, Linux, and the Raspberry Pi.
 
 ```sh
 curl -X POST http://localhost/api/print/text \
@@ -14,58 +16,52 @@ curl -X POST http://localhost/api/print/text \
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white">
   <img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache_2.0-green">
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-blue">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-ready-7c3aed">
   <img alt="Protocol" src="https://img.shields.io/badge/protocol-ESC%2FPOS-orange">
 </p>
 
-> **What is shortorder?** shortorder is an open-source REST API for thermal
-> receipt printers, written in Go. It turns an ESC/POS USB printer (like the
-> Volcora v-WRP2-A1W or an Epson TM-series) into a network service you can drive
-> from any language, script, smart-home automation, or AI agent. It runs great on
-> a Raspberry Pi as a `systemd` appliance, or on a Windows/Mac desktop.
+## What it is
 
----
+A REST and MCP interface to an ESC/POS USB receipt printer: the Volcora
+v-WRP2-A1W, an Epson TM-series, or most compatible clones. You can drive it from an LLM agent, a shell script, a smart-home automation, or any language that can make an HTTP request.
 
-## ✨ Features
+A few things people use it for:
 
-- 🖨️ **Print text, QR codes, and images** over a dead-simple JSON API.
-- ✂️ **Auto-cuts** the receipt (partial or full cut).
-- 🔌 **Plug-and-play USB detection** — finds the printer, no driver install or
-  print queue setup required.
-- 🧱 **Single static binary** — pure Go, `CGO_ENABLED=0`, nothing to install
-  alongside it.
-- 🍓 **Raspberry Pi ready** — ships as a `.deb`/`.rpm`/`.apk` that installs a
-  `systemd` service and turns the Pi into a `shortorder.local` print appliance.
-- 🌐 **Built-in web UI** — see connected devices, run test prints, and read the
-  API docs in your browser.
-- 📋 **Structured request logging** — every call is logged with its outcome.
-- 🎛️ **ESC/POS under the hood** — works with the huge family of Epson-compatible
-  receipt printers; add new models with a one-line allowlist entry.
+- Printing order tickets for a kitchen, café, or market stall.
+- Letting an AI assistant print reminders, notes, or labels on request.
+- Printing QR codes for inventory, packages, or Wi-Fi guest access.
+- Scheduled output, like a morning weather slip, a daily summary, or jokes and memes.
 
-## 💡 What can you build with it?
+## Use it from an AI agent
 
-- A **home automation printer** — print reminders, shopping lists, or the day's
-  calendar from Home Assistant / Node-RED / a cron job.
-- An **order ticket printer** for a café, pop-up, market stall, or home kitchen.
-- A **label / QR printer** for inventory, packages, or Wi-Fi guest passwords.
-- An **AI agent's hands in the real world** — let an LLM or chatbot physically
-  print notes, tickets, or art via a single HTTP POST.
-- A **fun gadget** — print memes, daily weather, tarot cards, or "word of the day"
-  receipts on a schedule.
+This is the part that makes it AI-enabled. There are three ways an agent can find and use the printer.
 
-## 🖨️ Supported hardware
+**MCP server.** shortorder exposes the printer as [Model Context Protocol](https://modelcontextprotocol.io) tools: `list_printers`, `print_text`, `print_qr`, `print_image`, and `cut`. An MCP-aware agent gets the tool schemas automatically. Two transports are supported.
+
+stdio, for agents that launch a tool as a subprocess:
+
+```jsonc
+// e.g. claude_desktop_config.json, or any MCP client
+{ "mcpServers": { "shortorder": { "command": "shortorder", "args": ["mcp"] } } }
+```
+
+HTTP (streamable transport) at `POST /mcp`, live whenever the service is running.
+
+**OpenAPI.** A 3.1 descriptor is served at `/openapi.json` (and `/.well-known/openapi.json`) for function-calling agents and tool loaders that import an OpenAPI spec.
+
+**mDNS.** When running, the service advertises `_shortorder._tcp` on the local network with TXT records (version, path, api, mcp, openapi), so an agent can find the box without being told its IP. Browse it with `dns-sd -B _shortorder._tcp` or `avahi-browse _shortorder._tcp`.
+
+## Supported hardware
 
 | Printer | Interface | Status |
 |---------|-----------|--------|
-| **Volcora v-WRP2-A1W** | USB (ESC/POS) | ✅ Supported |
-| Epson TM-series & compatible clones | USB (ESC/POS) | ✅ Works (same USB identity) |
+| Volcora v-WRP2-A1W | USB (ESC/POS) | Supported |
+| Epson TM-series and compatible clones | USB (ESC/POS) | Works (same USB identity) |
 
-Most inexpensive 80mm/58mm USB receipt printers are **ESC/POS** and
-Epson-compatible. To add one, drop a `Model` (USB vendor/product ID and/or a
-name substring) into the allowlist in
-[`internal/printer/printer.go`](internal/printer/printer.go) — the print path is
-already universal.
+Most inexpensive 80mm and 58mm USB receipt printers are ESC/POS and Epson-compatible. To add one, put a **Model** (USB vendor/product ID and/or a name substring) in the allowlist in
+[`internal/printer/printer.go`](internal/printer/printer.go). The print path is already shared across models.
 
-## 🚀 Quick start
+## Quick start
 
 ```sh
 # Build a single static binary into ./bin
@@ -78,50 +74,50 @@ make build        # or: CGO_ENABLED=0 go build -o bin/shortorder ./cmd/shortorde
 ./bin/shortorder
 ```
 
-Now open the **web UI** in a browser:
+Open the web UI in a browser. It lists connected devices, runs test prints, and documents the API.
 
-- Linux / macOS → <http://localhost/>
-- Windows → <http://localhost:8080/>
+- Linux and macOS: <http://localhost/>
+- Windows: <http://localhost:8080/>
 
-…or print from anything that speaks HTTP:
+Or print from anything that speaks HTTP:
 
 ```sh
-# Plain text, centered & bold, then cut
+# Plain text, centered and bold, then cut
 curl -X POST http://localhost/api/print/text \
   -H 'Content-Type: application/json' \
   -d '{"text":"ORDER #42","align":"center","bold":true,"cut":true}'
 
-# A scannable QR code with a caption
+# A QR code with a caption
 curl -X POST http://localhost/api/print/qr \
   -H 'Content-Type: application/json' \
   -d '{"data":"https://example.com","caption":"scan me"}'
 
-# Any PNG / JPEG / GIF, scaled to fit and dithered
+# Any PNG, JPEG, or GIF, scaled to fit and dithered
 curl -X POST 'http://localhost/api/print/image?align=center' \
   --data-binary @logo.png -H 'Content-Type: application/octet-stream'
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 | Flag        | Env                  | Default                       | Description                               |
 |-------------|----------------------|-------------------------------|-------------------------------------------|
 | `-addr`     | `SHORTORDER_ADDR`    | `:80` (`:8080` on Windows)    | HTTP listen address                       |
-| `-printer`  | `SHORTORDER_PRINTER` | _(auto)_                      | Force a specific detected printer by name |
+| `-printer`  | `SHORTORDER_PRINTER` | auto                          | Force a specific detected printer by name |
 | `-width`    | `SHORTORDER_WIDTH`   | `576`                         | Print head width in dots (80mm=576, 58mm=384) |
 | `-debug`    |                      | `false`                       | Verbose request logging                   |
 | `-list`     |                      |                               | List detected printers and exit           |
 | `-version`  |                      |                               | Print version and exit                    |
 
-> Port `80` is the default on Linux/macOS (the Raspberry Pi service runs as root
-> and binds it directly). On Windows it defaults to `8080` to avoid the common
-> `http.sys`/IIS collision and the need for elevation.
+Port 80 is the default on Linux and macOS (the Raspberry Pi service runs as root
+and binds it directly). On Windows it defaults to 8080 to avoid the common
+`http.sys`/IIS collision and the need for elevation.
 
-## 🌐 HTTP API
+## HTTP API
 
-| Method & path           | Purpose                                       |
+| Method and path         | Purpose                                       |
 |-------------------------|-----------------------------------------------|
 | `GET  /`                | Web UI: devices, test prints, API docs        |
-| `GET  /healthz`         | Liveness + version                            |
+| `GET  /healthz`         | Liveness and version                          |
 | `GET  /api/printers`    | List supported models and detected devices    |
 | `POST /api/print/text`  | Print formatted text                          |
 | `POST /api/print/qr`    | Render and print a QR code                     |
@@ -131,39 +127,16 @@ curl -X POST 'http://localhost/api/print/image?align=center' \
 | `GET  /openapi.json`    | OpenAPI 3.1 descriptor (also `/.well-known/openapi.json`) |
 | `POST /mcp`             | MCP server (HTTP streamable transport)         |
 
-📖 **Full request/response reference:** [docs/API.md](docs/API.md).
+Full request and response reference: [docs/API.md](docs/API.md).
 
-> 💡 For crisp receipt text use `/api/print/text` (the printer's native font).
-> Image mode rasterizes at the head's dot density, so keep any text inside an
-> image generously sized or it can print faint.
+For crisp receipt text, use `/api/print/text` (the printer's native font). Image
+mode rasterizes at the head's dot density, so keep any text inside an image
+generously sized or it can print faint.
 
-## 🤖 Discovery for AI agents
-
-shortorder is built to be **discovered and used by agents** with zero glue code,
-at three levels:
-
-- **MCP server** — exposes the printer as [Model Context Protocol](https://modelcontextprotocol.io)
-  tools: `list_printers`, `print_text`, `print_qr`, `print_image`, `cut`. Any
-  MCP-aware agent gets the typed tool schemas automatically. Two transports:
-  - **stdio** (for agents that launch a subprocess):
-    ```jsonc
-    // e.g. claude_desktop_config.json / any MCP client
-    { "mcpServers": { "shortorder": { "command": "shortorder", "args": ["mcp"] } } }
-    ```
-  - **HTTP** (streamable transport) at `POST /mcp` — already live whenever the
-    service is running.
-- **OpenAPI 3.1** at `/openapi.json` (and `/.well-known/openapi.json`) — for
-  function-calling agents and tool loaders (LangChain, LlamaIndex, codegen) that
-  import an OpenAPI spec.
-- **mDNS / DNS-SD** — advertises `_shortorder._tcp` on the LAN with TXT records
-  (`version`, `path`, `api`, `mcp`, `openapi`), so an agent finds the box with no
-  IP configuration. Browse it with `dns-sd -B _shortorder._tcp` or
-  `avahi-browse _shortorder._tcp`.
-
-## 🍓 Deploy on a Raspberry Pi (Debian package)
+## Deploy on a Raspberry Pi (Debian package)
 
 shortorder publishes `.deb`, `.rpm`, and `.apk` packages. On a Raspberry Pi
-(arm64), install the `.deb` and you get a self-starting print appliance:
+(arm64), install the `.deb` to get a service that starts on boot:
 
 ```sh
 sudo dpkg -i shortorder_*_linux_arm64.deb
@@ -172,11 +145,11 @@ sudo dpkg -i shortorder_*_linux_arm64.deb
 The package:
 
 - installs the binary to `/usr/bin/shortorder`,
-- installs and **enables a `systemd` service** (`shortorder.service`) that starts
-  on boot and restarts on failure,
-- serves the UI + API on **port 80**,
-- **sets the Pi's hostname to `shortorder`**, so it's reachable at
-  **<http://shortorder.local/>** over mDNS.
+- installs and enables a `systemd` service (`shortorder.service`) that starts on
+  boot and restarts on failure,
+- serves the UI and API on port 80,
+- sets the Pi's hostname to `shortorder`, so it's reachable at
+  <http://shortorder.local/> over mDNS.
 
 ```sh
 sudo systemctl status shortorder      # check it's running
@@ -186,68 +159,50 @@ echo 'SHORTORDER_ADDR=:8080' | sudo tee /etc/default/shortorder   # override set
 
 Plug a supported USB printer into the Pi and it's detected automatically.
 
-## 🛠️ How it works
+## How it works
 
-Receipt printers speak **ESC/POS**: a print job is just a byte stream of
-printable text plus control sequences for formatting, raster bitmaps, and the
-cutter. shortorder renders each API request to ESC/POS and writes it **straight
-to the printer's USB device** — no spooler, print queue, or driver install:
+Receipt printers speak ESC/POS. A print job is a byte stream of printable text
+plus control sequences for formatting, raster bitmaps, and the cutter.
+shortorder renders each API request to ESC/POS and writes it straight to the
+printer's USB device, with no spooler, print queue, or driver install:
 
-- **Windows** — finds the printer via the USB printer device interface
+- On Windows, it finds the printer via the USB printer device interface
   (`GUID_DEVINTERFACE_USBPRINT`) and writes with `CreateFile`/`WriteFile`.
-- **Linux / Raspberry Pi** — finds the printer in `sysfs`, matches its USB
+- On Linux and the Raspberry Pi, it finds the printer in `sysfs`, matches its USB
   VID/PID against the allowlist, and writes to its `usblp` node (`/dev/usb/lp0`).
 
-QR codes and images are rendered to a 1-bit raster (Floyd–Steinberg dithered for
+QR codes and images are rendered to a 1-bit raster (Floyd-Steinberg dithered for
 photos and grayscale) and sent with the `GS v 0` raster command, so output is
-identical across printers regardless of their native graphics support.
+the same across printers regardless of their native graphics support.
 
-## 📋 Logging
+## Logging
 
-Every request is logged as a single structured line — method, path, status,
-size, duration, client, and outcome — with the level keyed to the result
-(`INFO` for 2xx/3xx, `WARN` for 4xx, `ERROR` for 5xx) so invalid commands and
-print failures stand out:
+Every request is logged as one structured line with method, path, status, size, duration, client, and outcome. The level follows the result (`INFO` for 2xx and 3xx, `WARN` for 4xx, `ERROR` for 5xx), so invalid commands and print failures stand out.
 
-```
-level=INFO  msg=request method=POST path=/api/print/text status=200 ... info="printed shortorder-text on \"EPSON TM-T20II\" (44 bytes)"
-level=WARN  msg=request method=POST path=/api/print/text status=400 ... info="text is required"
-```
+## Building releases
 
-## 📦 Building releases
-
-[GoReleaser](https://goreleaser.com) builds the full
-`linux / windows / darwin × amd64 / arm64` matrix plus the Linux packages:
+[GoReleaser](https://goreleaser.com) builds the full matrix (linux, windows, and darwin, for amd64 and arm64) plus the Linux packages:
 
 ```sh
 make check          # validate .goreleaser.yaml
 make snapshot       # full matrix + .deb/.rpm/.apk into ./dist (no publish)
-make tag V=v0.1.0   # tag + push -> CI cuts a GitHub release
+make tag V=v0.1.0   # tag + push, CI cuts a GitHub release
 ```
 
-## ❓ FAQ
+## FAQ
 
-**Does it need printer drivers?** No. shortorder talks to the printer's raw USB
-endpoint directly. There's no driver, print queue, or spooler to configure.
+**Does it need printer drivers?** No. shortorder talks to the printer's raw USB endpoint directly. There's no driver, print queue, or spooler to configure.
 
-**What printers are supported?** The Volcora v-WRP2-A1W and Epson-compatible
-ESC/POS USB receipt printers. Adding a model is a one-line allowlist change.
+**What printers are supported?** The Volcora v-WRP2-A1W and Epson-compatible ESC/POS USB receipt printers. Adding a model is a one-line allowlist change.
 
-**Which platforms?** Printing works on **Windows** and **Linux** (including
-Raspberry Pi). The binary also builds and runs on macOS, where the print path is
-a stub pending a CUPS backend.
+**Which platforms?** Printing works on Windows and Linux, including the Raspberry Pi. The binary also builds and runs on macOS, where the print path is a stub pending a CUPS backend.
 
-**Can an AI agent or LLM use this?** Yes — that's a primary use case. It ships an
-**MCP server** (stdio + HTTP) so MCP-aware agents auto-discover typed print
-tools, an **OpenAPI** spec for function-calling agents, and **mDNS** so agents
-find it on the LAN. Or just POST the plain REST API. See
-[Discovery for AI agents](#-discovery-for-ai-agents).
+**Can an AI agent or LLM use this?** Yes. It ships an MCP server (stdio and HTTP) so MCP-aware agents discover the print tools, an OpenAPI spec for function-calling agents, and mDNS so agents find it on the LAN. You can also just POST the REST API. See [Use it from an AI agent](#use-it-from-an-ai-agent).
 
 **Does it phone home or need the internet?** No. It's a fully local service.
 
-**What's the wire protocol to the printer?** ESC/POS over USB (the `usbprint`
-device interface on Windows, the `usblp` character device on Linux).
+**What's the wire protocol to the printer?** ESC/POS over USB: the `usbprint` device interface on Windows, the `usblp` character device on Linux.
 
-## 📄 License
+## License
 
 [Apache 2.0](LICENSE). Contributions and new printer models welcome.
