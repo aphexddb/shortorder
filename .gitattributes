@@ -5,3 +5,7 @@
 *.yaml      text eol=lf
 *.yml       text eol=lf
 Makefile    text eol=lf
+
+# Embedded font binaries — never apply line-ending or text filters; CRLF
+# conversion would corrupt the TTFs that go:embed bakes into the binary.
+*.ttf       binary

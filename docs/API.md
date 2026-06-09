@@ -161,15 +161,17 @@ in the printer's native character grid, this prints *anything you can draw*:
 logos, free positioning, rotation, shapes, rules, gradients, embedded images.
 Printed as a 1-bit dithered raster.
 
-**Fonts.** For determinism the host's fonts are **not** used — text renders in a
-bundled font (the BSD-licensed Go fonts) so the same markup prints identically on
-every host, including a bare appliance with no fonts installed. Consequences:
-every `font-family` (serif, sans-serif, cursive, a specific name, …) maps to that
-one typeface, and `font-weight`/`font-style` are **not** differentiated (no real
-bold or italic). Map `font-family` to a generic (`sans-serif`, `monospace`); for
-crisp, genuinely bold or styled receipt text use `/api/print/text` or
-`/api/print/document` instead. (An SVG that requests a single specific font with
-no generic fallback returns a clean error rather than rendering.)
+**Fonts.** For determinism the host's fonts are **not** used — text renders in
+fonts bundled into the binary, so the same markup prints identically on every
+host, including a bare appliance with no fonts installed. Three faces ship:
+**Roboto** (sans-serif), **Gelasio** (serif — the open, Georgia-metric-compatible
+face), and **Go Mono** (monospace), all under the SIL Open Font License. The CSS
+generic families (`serif`, `sans-serif`, `monospace`, …) and common named fonts
+(Georgia, Times, Arial, Helvetica, Courier, …) map onto these; a font we don't
+recognize is logged and **falls back to sans-serif**, so text always renders.
+`font-weight`/`font-style` are **not** differentiated (no real bold or italic) —
+for crisp, genuinely bold or styled receipt text use `/api/print/text` or
+`/api/print/document` instead.
 
 Prefer native text (`/api/print/text`, `/api/print/document`) when the grid is
 enough: it is crisper, selectable, supports real bold, and is a fraction of the

@@ -60,6 +60,9 @@ func main() {
 		level = slog.LevelDebug
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	// Make this the default so lower-level packages (e.g. the SVG font seeder in
+	// internal/escpos) log through the same handler.
+	slog.SetDefault(log)
 
 	if *list {
 		listPrinters(log)
@@ -145,6 +148,7 @@ const (
 // closes. Used by `shortorder mcp`.
 func runStdioMCP() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(log)
 	srv := server.New(server.Config{
 		PrinterName: os.Getenv("SHORTORDER_PRINTER"),
 		Width:       envInt("SHORTORDER_WIDTH", 576),

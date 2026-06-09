@@ -1,6 +1,8 @@
 package escpos
 
 import (
+	"bytes"
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -49,21 +51,30 @@ func TestSVGImageRendersInk(t *testing.T) {
 	}
 }
 
-// An unresolvable font must NOT crash the process (canvas panics internally) —
-// SVGImage recovers it into a clean error. Uses a guaranteed-absent family so
-// the test holds regardless of host fonts or whether bundled-font seeding ran.
-func TestSVGImageUnknownFontCleanError(t *testing.T) {
+// An unresolvable font must NOT crash the process (canvas panics internally).
+// Instead SVGImage logs a warning and aliases the family to the bundled sans
+// fallback, so text still renders. Verifies both the fallback render and that
+// the miss is logged. Uses a guaranteed-absent family unique to this test so the
+// alias/log state isn't shared with other tests.
+func TestSVGImageUnknownFontFallsBackAndLogs(t *testing.T) {
+	prev := slog.Default()
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+	defer slog.SetDefault(prev)
+
+	const fam = "zzz-unique-missing-font-7c4e1a"
 	svg := `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40" viewBox="0 0 100 40">` +
-		`<text x="4" y="28" font-family="zzz-nonexistent-font-9f3a2b" font-size="20">Hi</text></svg>`
+		`<text x="4" y="28" font-family="` + fam + `" font-size="20">Hi</text></svg>`
 	img, err := SVGImage(svg, 200)
-	if err == nil {
-		t.Fatal("expected a clean error for an unresolvable font, not a successful render")
+	if err != nil {
+		t.Fatalf("unknown font should fall back and render, got %v", err)
 	}
-	if img != nil {
-		t.Fatal("expected a nil image alongside the error")
+	if pack(img) == nil {
+		t.Fatal("expected a rendered image")
 	}
-	if !strings.Contains(err.Error(), "render svg") {
-		t.Fatalf("expected the recovered render error, got %v", err)
+	logged := buf.String()
+	if !strings.Contains(logged, "font not found") || !strings.Contains(logged, fam) {
+		t.Fatalf("expected a 'font not found' warning naming %q; log was:\n%s", fam, logged)
 	}
 }
 
