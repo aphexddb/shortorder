@@ -116,10 +116,17 @@ func main() {
 
 	<-ctx.Done()
 	log.Info("shutting down")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Graceful first: stop accepting, let in-flight requests finish. A streaming
+	// connection that never goes idle (e.g. an MCP client holding the /mcp SSE
+	// stream open) would otherwise block until the deadline, so on timeout we
+	// force every remaining connection closed rather than hang the quit.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Error("shutdown error", "err", err)
+		log.Warn("graceful shutdown timed out; forcing connections closed", "err", err)
+		if cerr := httpServer.Close(); cerr != nil {
+			log.Error("forced close failed", "err", cerr)
+		}
 	}
 }
 
