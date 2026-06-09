@@ -180,7 +180,7 @@ Requires Go 1.26 or newer.
 
 ```sh
 # Build a single static binary into ./bin
-make build        # or: CGO_ENABLED=0 go build -o bin/shortorder ./cmd/shortorder
+make build        # or: CGO_ENABLED=0 go build -tags=latex -o bin/shortorder ./cmd/shortorder
 
 # See what's detected
 ./bin/shortorder -list

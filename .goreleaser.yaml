@@ -18,6 +18,9 @@ builds:
       - CGO_ENABLED=0 # pure Go: fully static, no cross-toolchains needed
     flags:
       - -trimpath
+      # Use canvas's external-LaTeX path so release binaries do not compile the
+      # embedded Latin Modern font packages from canvas/latex.go.
+      - -tags=latex
     ldflags:
       - -s -w
       # Embed the literal tag (e.g. v0.2.0) so the version shown in the web UI

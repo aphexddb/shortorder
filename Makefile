@@ -5,17 +5,18 @@
 BINARY  := shortorder
 PKG     := ./cmd/shortorder
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+GO_TAGS := latex
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: build run test vet fmt list snapshot release check clean tag
 
 ## build: compile a host binary into ./bin
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
+	CGO_ENABLED=0 go build -tags=$(GO_TAGS) -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
 
 ## run: run the service locally (defaults to :8080)
 run:
-	go run $(PKG)
+	go run -tags=$(GO_TAGS) $(PKG)
 
 ## list: build then print detected supported printers
 list: build
@@ -23,9 +24,9 @@ list: build
 
 ## test / vet / fmt
 test:
-	go test ./...
+	go test -tags=$(GO_TAGS) ./...
 vet:
-	go vet ./...
+	go vet -tags=$(GO_TAGS) ./...
 fmt:
 	gofmt -w cmd internal
 

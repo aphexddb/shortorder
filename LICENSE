@@ -209,3 +209,7 @@ Version 1.1. For details, see internal/escpos/fonts/Roboto-OFL.txt.
 
 This product bundles Gelasio, which is available under the SIL Open Font License,
 Version 1.1. For details, see internal/escpos/fonts/Gelasio-OFL.txt.
+
+This product includes local forks of github.com/tdewolff/canvas and
+github.com/tdewolff/font, which are available under the MIT License. For
+details, see third_party/canvas/LICENSE.md and third_party/font/LICENSE.md.
