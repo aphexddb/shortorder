@@ -20,6 +20,7 @@ curl -X POST http://localhost/api/print/text \
   <img alt="Protocol" src="https://img.shields.io/badge/protocol-ESC%2FPOS-orange">
 </p>
 
+
 ## What it is
 
 A REST and MCP interface to an Epson-compatible ESC/POS USB receipt printer — the
@@ -304,6 +305,8 @@ make tag V=v0.1.0   # tag + push, CI cuts a GitHub release
 **Does it phone home or need the internet?** No. It's a fully local service.
 
 **What's the wire protocol to the printer?** ESC/POS over USB: the `usbprint` device interface on Windows, the `usblp` character device on Linux.
+
+**What barcodes are supported?** Code 128, GS1-128, Code 39, Code 93, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, ITF-14, Standard 2 of 5, Codabar, Data Matrix, PDF417
 
 ## License
 
