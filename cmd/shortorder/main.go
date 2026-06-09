@@ -94,11 +94,14 @@ func main() {
 	}
 
 	// Advertise over mDNS / DNS-SD so agents on the LAN can discover the service
-	// without knowing its IP (best-effort — never fatal).
-	if mdns, err := advertiseMDNS(*addr, version); err != nil {
+	// without knowing its IP (best-effort — never fatal). Held in an outer-scoped
+	// var so it can be torn down explicitly (and with a time bound) at shutdown,
+	// rather than via defer — see the shutdown sequence below.
+	var mdns *zeroconf.Server
+	if m, err := advertiseMDNS(*addr, version); err != nil {
 		log.Warn("mDNS advertisement unavailable", "err", err)
-	} else if mdns != nil {
-		defer mdns.Shutdown()
+	} else if m != nil {
+		mdns = m
 		log.Info("advertising over mDNS", "service", mdnsService, "instance", mdnsInstance)
 	}
 
@@ -116,10 +119,25 @@ func main() {
 
 	<-ctx.Done()
 	log.Info("shutting down")
-	// Graceful first: stop accepting, let in-flight requests finish. A streaming
-	// connection that never goes idle (e.g. an MCP client holding the /mcp SSE
-	// stream open) would otherwise block until the deadline, so on timeout we
-	// force every remaining connection closed rather than hang the quit.
+
+	// Stop advertising first. grandcat/zeroconf v1.0.0's Shutdown waits on its
+	// receive goroutines, which sit in a blocking ReadFrom and don't always
+	// unblock when the socket closes (notably on Windows) — so it can hang
+	// indefinitely. Bound it: send the goodbye if it's quick, give up otherwise.
+	if mdns != nil {
+		done := make(chan struct{})
+		go func() { mdns.Shutdown(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			log.Warn("mDNS shutdown timed out; continuing")
+		}
+	}
+
+	// Drain HTTP gracefully: stop accepting, let in-flight requests finish. A
+	// streaming connection that never goes idle (e.g. an MCP client holding the
+	// /mcp SSE stream open) would otherwise block until the deadline, so on
+	// timeout force every remaining connection closed rather than hang the quit.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
