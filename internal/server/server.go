@@ -142,16 +142,38 @@ func (s *Server) handlePrinters(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// textRequest is the body for POST /api/print/text.
-type textRequest struct {
+// textSegment is one styled line of a text job. Every field is optional; the
+// zero value prints plain, left-aligned text. Segments are how a single job
+// mixes alignment, size, and emphasis line by line — e.g. a centered, enlarged,
+// bold header above left-aligned body text — using the same ESC/POS primitives
+// the flat fields use.
+type textSegment struct {
 	Text      string `json:"text"`
 	Align     string `json:"align"`     // left|center|right
 	Bold      bool   `json:"bold"`      //
 	Underline byte   `json:"underline"` // 0,1,2
 	Width     int    `json:"width"`     // char magnification 1..8
 	Height    int    `json:"height"`    // char magnification 1..8
-	Feed      int    `json:"feed"`      // extra line feeds after text
-	Cut       *bool  `json:"cut"`       // cut after printing (default true)
+}
+
+// textRequest is the body for POST /api/print/text. There are two ways to
+// specify content, simplest first:
+//
+//   - text plus the flat style fields: one style applied to the whole block.
+//   - lines: an ordered list of independently styled segments. When lines is
+//     non-empty it takes precedence and the flat text/style fields are ignored.
+//
+// feed and cut always apply to the job as a whole, after the content.
+type textRequest struct {
+	Text      string        `json:"text"`
+	Align     string        `json:"align"`     // left|center|right
+	Bold      bool          `json:"bold"`      //
+	Underline byte          `json:"underline"` // 0,1,2
+	Width     int           `json:"width"`     // char magnification 1..8
+	Height    int           `json:"height"`    // char magnification 1..8
+	Lines     []textSegment `json:"lines"`     // optional per-line styling; overrides text when set
+	Feed      int           `json:"feed"`      // extra line feeds after text
+	Cut       *bool         `json:"cut"`       // cut after printing (default true)
 }
 
 func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
@@ -159,8 +181,8 @@ func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.Text == "" {
-		writeErr(w, http.StatusBadRequest, fmt.Errorf("text is required"))
+	if req.Text == "" && len(req.Lines) == 0 {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("text or lines is required"))
 		return
 	}
 	s.dispatch(w, "shortorder-text", buildText(req))
@@ -168,20 +190,26 @@ func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
 
 // buildText renders a text job to ESC/POS. Pure (no I/O) so both the HTTP
 // handler and the MCP tool share exactly one code path.
+//
+// When req.Lines is set, each segment is rendered with its own style; otherwise
+// the flat text/style fields render as a single segment. Either way feed and
+// cut apply once, at the end.
 func buildText(req textRequest) []byte {
 	b := escpos.New()
-	b.Align(parseAlign(req.Align))
-	if req.Width > 0 || req.Height > 0 {
-		b.Size(orOne(req.Width), orOne(req.Height))
+	if len(req.Lines) > 0 {
+		for _, seg := range req.Lines {
+			writeSegment(b, seg)
+		}
+	} else {
+		writeSegment(b, textSegment{
+			Text:      req.Text,
+			Align:     req.Align,
+			Bold:      req.Bold,
+			Underline: req.Underline,
+			Width:     req.Width,
+			Height:    req.Height,
+		})
 	}
-	if req.Bold {
-		b.Bold(true)
-	}
-	if req.Underline > 0 {
-		b.Underline(req.Underline)
-	}
-	b.Line(req.Text)
-	b.Bold(false).Underline(0).Size(1, 1)
 	if req.Feed > 0 {
 		b.Feed(req.Feed)
 	}
@@ -189,6 +217,24 @@ func buildText(req textRequest) []byte {
 		b.Cut()
 	}
 	return b.Bytes()
+}
+
+// writeSegment emits one styled line, then resets the styles it set so segments
+// don't bleed into one another (or into the feed/cut that follow). Each segment
+// sets its own alignment, so alignment needn't be reset between segments.
+func writeSegment(b *escpos.Builder, seg textSegment) {
+	b.Align(parseAlign(seg.Align))
+	if seg.Width > 0 || seg.Height > 0 {
+		b.Size(orOne(seg.Width), orOne(seg.Height))
+	}
+	if seg.Bold {
+		b.Bold(true)
+	}
+	if seg.Underline > 0 {
+		b.Underline(seg.Underline)
+	}
+	b.Line(seg.Text)
+	b.Bold(false).Underline(0).Size(1, 1)
 }
 
 // qrRequest is the body for POST /api/print/qr.

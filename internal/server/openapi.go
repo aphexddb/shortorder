@@ -76,14 +76,27 @@ func (s *Server) openAPISpec(serverURL string) map[string]any {
 		"components": map[string]any{
 			"schemas": map[string]any{
 				"TextRequest": object(map[string]any{
-					"text":      map[string]any{"type": "string", "description": `Text to print; \n for line breaks.`},
+					"text":      map[string]any{"type": "string", "description": `Text to print; \n for line breaks. Required unless "lines" is given; ignored when "lines" is given.`},
 					"align":     align,
 					"bold":      map[string]any{"type": "boolean"},
 					"underline": map[string]any{"type": "integer", "enum": []int{0, 1, 2}},
 					"width":     map[string]any{"type": "integer", "minimum": 1, "maximum": 8},
 					"height":    map[string]any{"type": "integer", "minimum": 1, "maximum": 8},
-					"feed":      map[string]any{"type": "integer", "minimum": 0},
-					"cut":       cut,
+					"lines": map[string]any{
+						"type":        "array",
+						"items":       ref("TextSegment"),
+						"description": `Optional per-line styling. When present, each item prints as its own styled line and the top-level text/align/bold/underline/width/height are ignored.`,
+					},
+					"feed": map[string]any{"type": "integer", "minimum": 0},
+					"cut":  cut,
+				}, nil),
+				"TextSegment": object(map[string]any{
+					"text":      map[string]any{"type": "string", "description": `Text for this line; \n for line breaks.`},
+					"align":     align,
+					"bold":      map[string]any{"type": "boolean"},
+					"underline": map[string]any{"type": "integer", "enum": []int{0, 1, 2}},
+					"width":     map[string]any{"type": "integer", "minimum": 1, "maximum": 8},
+					"height":    map[string]any{"type": "integer", "minimum": 1, "maximum": 8},
 				}, []string{"text"}),
 				"QRRequest": object(map[string]any{
 					"data":     map[string]any{"type": "string", "description": "Text or URL to encode."},

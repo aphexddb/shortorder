@@ -39,23 +39,56 @@ Lists supported models and the printers currently detected.
 
 ## `POST /api/print/text`
 
-Print formatted text.
+Print formatted text. Provide the content one of two ways: `text` with the flat
+style fields (one style for the whole block), or `lines` for per-line styling.
+At least one of `text` or `lines` is required.
 
-| Field       | Type   | Default | Notes                                     |
-|-------------|--------|---------|-------------------------------------------|
-| `text`      | string | —       | **Required.** `\n` for line breaks.       |
-| `align`     | string | `left`  | `left` \| `center` \| `right`             |
-| `bold`      | bool   | `false` | Emphasized printing                       |
-| `underline` | int    | `0`     | `0` off, `1` thin, `2` thick              |
-| `width`     | int    | `1`     | Character width magnification, `1`–`8`    |
-| `height`    | int    | `1`     | Character height magnification, `1`–`8`   |
-| `feed`      | int    | `0`     | Extra blank lines after the text          |
-| `cut`       | bool   | `true`  | Cut after printing                        |
+| Field       | Type   | Default | Notes                                                                 |
+|-------------|--------|---------|-----------------------------------------------------------------------|
+| `text`      | string | —       | `\n` for line breaks. Required unless `lines` is given; ignored when `lines` is given. |
+| `align`     | string | `left`  | `left` \| `center` \| `right`                                         |
+| `bold`      | bool   | `false` | Emphasized printing                                                   |
+| `underline` | int    | `0`     | `0` off, `1` thin, `2` thick                                          |
+| `width`     | int    | `1`     | Character width magnification, `1`–`8`                                |
+| `height`    | int    | `1`     | Character height magnification, `1`–`8`                               |
+| `lines`     | array  | —       | Optional per-line styling; see below. Overrides `text` when present. |
+| `feed`      | int    | `0`     | Extra blank lines after the text                                      |
+| `cut`       | bool   | `true`  | Cut after printing                                                   |
 
 ```sh
 curl -X POST http://127.0.0.1:8080/api/print/text \
   -H 'Content-Type: application/json' \
   -d '{"text":"ORDER #42\nLatte x2","align":"center","width":2,"height":2,"cut":true}'
+```
+
+### Per-line styling (`lines`)
+
+For receipts that mix styles, send `lines`: an ordered array of styled segments,
+each printed on its own line. When `lines` is present the top-level `text` and
+style fields are ignored; `feed` and `cut` still apply to the whole job. Each
+segment takes the same style fields as the flat form (all optional):
+
+| Field       | Type   | Default | Notes                                   |
+|-------------|--------|---------|-----------------------------------------|
+| `text`      | string | —       | **Required.** `\n` for line breaks.     |
+| `align`     | string | `left`  | `left` \| `center` \| `right`           |
+| `bold`      | bool   | `false` | Emphasized printing                     |
+| `underline` | int    | `0`     | `0` off, `1` thin, `2` thick            |
+| `width`     | int    | `1`     | Character width magnification, `1`–`8`  |
+| `height`    | int    | `1`     | Character height magnification, `1`–`8` |
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/print/text \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "lines": [
+      {"text":"ORDER #42","align":"center","bold":true,"width":2,"height":2},
+      {"text":"Latte x2","align":"left"},
+      {"text":"Thank you!","align":"center","underline":1}
+    ],
+    "feed": 1,
+    "cut": true
+  }'
 ```
 
 ## `POST /api/print/qr`
@@ -137,7 +170,10 @@ tool loaders. The `servers[0].url` is filled in from the request host.
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server over the HTTP
 streamable transport (stateless). Exposes the tools `list_printers`,
-`print_text`, `print_qr`, `print_image`, and `cut`. Example (JSON-RPC):
+`print_text`, `print_qr`, `print_image`, and `cut`, mirroring the REST API.
+`print_text` takes `text` with the flat style fields for uniform styling, or an
+optional `lines` array (each item a styled segment) to mix alignment, sizes, and
+emphasis line by line. Example (JSON-RPC):
 
 ```sh
 curl -X POST http://127.0.0.1:8080/mcp \
