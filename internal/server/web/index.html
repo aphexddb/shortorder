@@ -120,6 +120,27 @@
         <button id="btn-qr">Print QR</button>
         <button class="alt" id="btn-cut">Cut only</button>
       </div>
+      <div class="row">
+        <input id="bc-input" type="text" placeholder="Barcode content…" value="SHORTORDER42">
+        <select id="bc-format" style="background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font:14px var(--mono);">
+          <option value="code128">CODE128</option>
+          <option value="gs1-128">GS1-128</option>
+          <option value="code39">CODE39</option>
+          <option value="code93">CODE93</option>
+          <option value="ean13">EAN-13</option>
+          <option value="ean8">EAN-8</option>
+          <option value="upca">UPC-A</option>
+          <option value="itf">ITF (Interleaved 2 of 5)</option>
+          <option value="itf14">ITF-14</option>
+          <option value="standard2of5">Standard 2 of 5</option>
+          <option value="codabar">Codabar</option>
+          <option value="datamatrix">DataMatrix (2D)</option>
+          <option value="pdf417">PDF417 (2D)</option>
+        </select>
+        <label class="inline"><input id="bc-wide" type="checkbox"> wide</label>
+        <label class="inline"><input id="bc-hri" type="checkbox"> numbers</label>
+        <button id="btn-bc">Print barcode</button>
+      </div>
       <div id="result"></div>
     </div>
   </section>
@@ -133,7 +154,7 @@
         <dt>OpenAPI</dt><dd><a id="openapi-link" href="/openapi.json"><span id="openapi-url"></span></a></dd>
         <dt>mDNS / DNS-SD</dt><dd><code>_shortorder._tcp</code> &nbsp;(<code>dns-sd -B _shortorder._tcp</code>)</dd>
       </dl>
-      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_qr</code>, <code>print_image</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
+      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_qr</code>, <code>print_barcode</code>, <code>print_image</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
     </div>
   </section>
 
@@ -225,6 +246,8 @@ $("#btn-text").onclick = () =>
   post("/api/print/text", { text: $("#text-input").value, align: "center", cut: $("#text-cut").checked });
 $("#btn-qr").onclick = () =>
   post("/api/print/qr", { data: $("#qr-input").value, caption: "shortorder", cut: true });
+$("#btn-bc").onclick = () =>
+  post("/api/print/barcode", { data: $("#bc-input").value, format: $("#bc-format").value, wide: $("#bc-wide").checked, hri: $("#bc-hri").checked, cut: true });
 $("#btn-cut").onclick = () => post("/api/cut");
 
 function esc(s) {
@@ -263,6 +286,21 @@ const endpoints = [
     ex: `curl -X POST ${base}/api/print/qr \\
   -H 'Content-Type: application/json' \\
   -d '{"data":"https://example.com","scale":8,"caption":"scan me"}'` },
+  { m: "POST", p: "/api/print/barcode", d: "Render and print a 1D or 2D barcode",
+    params: [
+      ["data", "string", "required", "Content to encode (digits only for ean/upc/itf/2of5)"],
+      ["format", "string", "code128", "code128 | gs1-128 | code39 | code93 | ean13 | ean8 | upca | itf | itf14 | standard2of5 | codabar | datamatrix | pdf417"],
+      ["width", "int", "auto", "Total width in dots (1D ~2/module, 2D scales the symbol; capped to head)"],
+      ["height", "int", "80", "Bar height in dots (1D only; ignored for 2D)"],
+      ["wide", "bool", "false", "Larger modules (1D ~4/module, 2D ~10); ignored when width is set"],
+      ["hri", "bool", "false", "Print the human-readable number under the code (EAN/UPC grouped); ignored if caption set"],
+      ["align", "string", "center", "left | center | right"],
+      ["caption", "string", "—", "Text printed under the code; overrides hri"],
+      ["cut", "bool", "true", "Cut after printing"],
+    ],
+    ex: `curl -X POST ${base}/api/print/barcode \\
+  -H 'Content-Type: application/json' \\
+  -d '{"data":"5901234123457","format":"ean13","hri":true}'` },
   { m: "POST", p: "/api/print/image", d: "Print a PNG/JPEG/GIF as a dithered raster",
     note: "Send the image as the raw request body (Content-Type: application/octet-stream) with ?cut= & ?align= query params, or as JSON { image_base64, align, cut }. Images wider than the head are scaled to fit.",
     ex: `curl -X POST '${base}/api/print/image?align=center&cut=true' \\

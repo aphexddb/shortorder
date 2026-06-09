@@ -61,6 +61,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/printers", s.handlePrinters)
 	mux.HandleFunc("POST /api/print/text", s.handleText)
 	mux.HandleFunc("POST /api/print/qr", s.handleQR)
+	mux.HandleFunc("POST /api/print/barcode", s.handleBarcode)
 	mux.HandleFunc("POST /api/print/image", s.handleImage)
 	mux.HandleFunc("POST /api/print/raw", s.handleRaw)
 	mux.HandleFunc("POST /api/cut", s.handleCut)
@@ -231,6 +232,64 @@ func buildQR(req qrRequest, width int) ([]byte, error) {
 	b.Image(img)
 	if req.Caption != "" {
 		b.Feed(1).Line(req.Caption)
+	}
+	b.Align(escpos.AlignLeft)
+	if cutOrDefault(req.Cut) {
+		b.Cut()
+	}
+	return b.Bytes(), nil
+}
+
+// barcodeRequest is the body for POST /api/print/barcode.
+type barcodeRequest struct {
+	Data    string `json:"data"`
+	Format  string `json:"format"` // code128|code39|code93|ean13|ean8|upca|itf|codabar
+	Width   int    `json:"width"`  // total barcode width in dots (default: ~2 dots/module)
+	Height  int    `json:"height"` // bar height in dots (default 80)
+	Wide    bool   `json:"wide"`   // wider bars (~4 dots/module) for dense codes / finicky scanners
+	HRI     bool   `json:"hri"`    // print the human-readable number under the code (EAN/UPC grouped)
+	Align   string `json:"align"`
+	Caption string `json:"caption"` // optional text under the code (overrides hri when set)
+	Cut     *bool  `json:"cut"`
+}
+
+func (s *Server) handleBarcode(w http.ResponseWriter, r *http.Request) {
+	var req barcodeRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	if req.Data == "" {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("data is required"))
+		return
+	}
+	data, err := buildBarcode(req, s.cfg.Width)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	s.dispatch(w, "shortorder-barcode", data)
+}
+
+// buildBarcode renders a barcode job to ESC/POS at the given head width. Pure
+// (no I/O) so the HTTP handler and the MCP tool share one code path.
+func buildBarcode(req barcodeRequest, width int) ([]byte, error) {
+	img, err := escpos.BarcodeImage(req.Data, req.Format, req.Width, req.Height, req.Wide)
+	if err != nil {
+		return nil, fmt.Errorf("render barcode: %w", err)
+	}
+	img = escpos.FitWidth(img, width)
+
+	// An explicit caption wins; otherwise hri prints the grouped digits.
+	caption := req.Caption
+	if caption == "" && req.HRI {
+		caption = escpos.BarcodeHRI(req.Format, req.Data)
+	}
+
+	b := escpos.New()
+	b.Align(parseAlignDefault(req.Align, escpos.AlignCenter))
+	b.Image(img)
+	if caption != "" {
+		b.Feed(1).Line(caption)
 	}
 	b.Align(escpos.AlignLeft)
 	if cutOrDefault(req.Cut) {

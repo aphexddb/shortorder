@@ -26,7 +26,7 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		mcpserver.WithInstructions(
 			"shortorder prints to a USB thermal receipt printer (ESC/POS). "+
 				"Call list_printers to confirm a device is connected, then use "+
-				"print_text, print_qr, or print_image to print, and cut to feed and "+
+				"print_text, print_qr, print_barcode, or print_image to print, and cut to feed and "+
 				"cut the paper. For crisp receipt text prefer print_text over embedding "+
 				"text in an image.",
 		),
@@ -57,6 +57,19 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		mcp.WithString("caption", mcp.Description("Optional text printed under the QR code.")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintQR)
+
+	m.AddTool(mcp.NewTool("print_barcode",
+		mcp.WithDescription("Render a barcode and print it, then optionally cut the paper. Supports 1D codes (CODE128, GS1-128, CODE39, CODE93, EAN-13/8, UPC-A, ITF, ITF-14, Standard 2 of 5, Codabar) and 2D codes (DataMatrix, PDF417)."),
+		mcp.WithString("data", mcp.Required(), mcp.Description("Content to encode. Numeric symbologies (ean13, ean8, upca, itf, itf14, standard2of5) accept digits only.")),
+		mcp.WithString("format", mcp.Description("Symbology: code128 | gs1-128 | code39 | code93 | ean13 | ean8 | upca | itf | itf14 | standard2of5 | codabar | datamatrix | pdf417 (default code128).")),
+		mcp.WithNumber("width", mcp.Description("Total width in dots (1D: default ~2 dots/module; 2D: scales the whole symbol). Capped to the head width.")),
+		mcp.WithNumber("height", mcp.Description("Bar height in dots for 1D codes (default 80). Ignored for 2D codes.")),
+		mcp.WithBoolean("wide", mcp.Description("Print larger modules (1D ~4 dots/module, 2D ~10) for dense symbologies or finicky scanners (default false). Ignored when width is set.")),
+		mcp.WithBoolean("hri", mcp.Description("Print the human-readable number under the code, grouped per symbology (EAN-8 4+4, EAN-13 1+6+6, UPC-A 1+5+5+1). Ignored if caption is set.")),
+		mcp.WithString("align", mcp.Description("Horizontal alignment: left | center | right (default center).")),
+		mcp.WithString("caption", mcp.Description("Optional text printed under the barcode; overrides hri when set.")),
+		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
+	), s.mcpPrintBarcode)
 
 	m.AddTool(mcp.NewTool("print_image",
 		mcp.WithDescription("Print a base64-encoded image (PNG/JPEG/GIF) as a dithered raster, scaled to fit the head, then optionally cut."),
@@ -129,6 +142,30 @@ func (s *Server) mcpPrintQR(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	return s.mcpPrint("shortorder-qr", payload)
+}
+
+func (s *Server) mcpPrintBarcode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	data, err := req.RequireString("data")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	cut := req.GetBool("cut", true)
+	job := barcodeRequest{
+		Data:    data,
+		Format:  req.GetString("format", ""),
+		Width:   req.GetInt("width", 0),
+		Height:  req.GetInt("height", 0),
+		Wide:    req.GetBool("wide", false),
+		HRI:     req.GetBool("hri", false),
+		Align:   req.GetString("align", ""),
+		Caption: req.GetString("caption", ""),
+		Cut:     &cut,
+	}
+	payload, err := buildBarcode(job, s.cfg.Width)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return s.mcpPrint("shortorder-barcode", payload)
 }
 
 func (s *Server) mcpPrintImage(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
