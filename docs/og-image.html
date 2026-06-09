@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!-- Source for og-image.png. Edit this, then re-rasterize with headless Chrome at 1200x630. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  :root{
+    --bg:#0c0e10; --surface:#14171a; --border:rgba(255,255,255,.09);
+    --text:#e9e7e0; --dim:#9aa1a8; --faint:#646b72;
+    --green:#54e08a; --ink:#06140d;
+    --display:'Space Grotesk',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1200px;height:630px;}
+  body{
+    font-family:var(--display); color:var(--text); background:var(--bg);
+    background-image:
+      radial-gradient(1100px 500px at 80% -10%, rgba(84,224,138,.12), transparent 60%),
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size:auto, 40px 40px, 40px 40px;
+    overflow:hidden; position:relative;
+  }
+  .frame{position:absolute; inset:0; padding:64px 72px; display:flex; flex-direction:column;}
+  .brand{display:flex; align-items:center; gap:14px; font-family:var(--mono); font-weight:700; font-size:30px; letter-spacing:-.01em;}
+  .brand .glyph{font-size:38px;}
+  .pill{margin-left:14px; font-family:var(--mono); font-size:15px; font-weight:600; color:var(--green);
+    border:1px solid rgba(84,224,138,.4); padding:4px 12px; border-radius:999px;}
+  .body{flex:1; display:flex; align-items:center; gap:56px; margin-top:8px;}
+  .left{flex:1;}
+  h1{font-size:74px; line-height:1.02; letter-spacing:-.025em; font-weight:700;}
+  h1 .pop{color:var(--green);}
+  p.sub{margin-top:26px; font-size:24px; line-height:1.45; color:var(--dim); max-width:620px;}
+  .chips{margin-top:30px; display:flex; gap:12px; flex-wrap:wrap;}
+  .chip{font-family:var(--mono); font-size:16px; color:var(--text); background:var(--surface);
+    border:1px solid var(--border); padding:9px 16px; border-radius:999px;}
+  .chip .dot{color:var(--green);}
+  /* faux receipt */
+  .receipt{width:300px; flex-shrink:0; background:#f6f2e7; color:#16150f; border-radius:10px;
+    padding:26px 24px; font-family:var(--mono); transform:rotate(2.2deg);
+    box-shadow:0 30px 70px rgba(0,0,0,.5); position:relative;}
+  .receipt::after{content:""; position:absolute; left:0; right:0; bottom:-10px; height:14px;
+    background:repeating-linear-gradient(135deg,#f6f2e7 0 10px,transparent 10px 20px);}
+  .r-h{text-align:center; font-weight:700; font-size:20px; letter-spacing:.04em;}
+  .r-sub{text-align:center; font-size:12px; color:#6a6657; margin-top:4px; margin-bottom:14px;}
+  .r-rule{border-top:1.5px dashed #b9b3a1; margin:12px 0;}
+  .r-row{display:flex; justify-content:space-between; font-size:14px; margin:7px 0;}
+  .r-row .amt{font-weight:600;}
+  .r-tot{display:flex; justify-content:space-between; font-size:16px; font-weight:700; margin-top:6px;}
+  .barcode{height:54px; margin:18px 0 8px;
+    background:
+      repeating-linear-gradient(90deg,
+        #16150f 0 2px, transparent 2px 4px,
+        #16150f 4px 7px, transparent 7px 9px,
+        #16150f 9px 10px, transparent 10px 14px,
+        #16150f 14px 18px, transparent 18px 20px,
+        #16150f 20px 21px, transparent 21px 24px);}
+  .barcode-num{text-align:center; font-size:13px; letter-spacing:.32em; color:#16150f;}
+  .footer{font-family:var(--mono); font-size:18px; color:var(--faint); letter-spacing:.02em;}
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="brand">
+      <span class="glyph">🧾</span>shortorder
+    </div>
+
+    <div class="body">
+      <div class="left">
+        <h1>Give your AI agent<br><span class="pop">a printer.</span></h1>
+        <p class="sub">A tiny Go binary that turns a USB thermal printer into an HTTP&nbsp;+&nbsp;MCP service. No drivers. No cloud. No spooler.</p>
+      </div>
+
+      <div class="receipt">
+        <div class="r-h">SHORTORDER</div>
+        <div class="r-sub">agent-driven kitchen</div>
+        <div class="r-rule"></div>
+        <div class="r-row"><span>print/text</span><span class="amt">200 OK</span></div>
+        <div class="r-row"><span>print/qr</span><span class="amt">200 OK</span></div>
+        <div class="r-row"><span>print/svg</span><span class="amt">200 OK</span></div>
+        <div class="r-rule"></div>
+        <div class="r-tot"><span>STATUS</span><span>READY</span></div>
+        <div class="barcode"></div>
+        <div class="barcode-num">SHORTORDER</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
