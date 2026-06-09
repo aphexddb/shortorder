@@ -42,13 +42,22 @@ func main() {
 
 	var (
 		addr        = flag.String("addr", envOr("SHORTORDER_ADDR", defaultAddr()), "HTTP listen address")
+		port        = flag.String("port", "", "HTTP listen port (overrides the port in -addr; also reads $PORT)")
 		printerName = flag.String("printer", os.Getenv("SHORTORDER_PRINTER"), "force a specific printer queue name (default: first detected supported printer)")
 		width       = flag.Int("width", envInt("SHORTORDER_WIDTH", 576), "print head width in dots (80mm=576, 58mm=384)")
 		debug       = flag.Bool("debug", false, "verbose request logging")
 		showVersion = flag.Bool("version", false, "print version and exit")
+		showHelp    = flag.Bool("help", false, "show usage (including -port) and exit")
 		list        = flag.Bool("list", false, "list detected supported printers and exit")
 	)
 	flag.Parse()
+
+	// Accept both the -help flag and a bare `help` subcommand (mirroring `mcp`),
+	// so `shortorder help` prints usage rather than starting the server.
+	if *showHelp || (len(os.Args) > 1 && os.Args[1] == "help") {
+		flag.Usage()
+		return
+	}
 
 	if *showVersion {
 		fmt.Printf("shortorder %s (commit %s, built %s)\n", version, commit, date)
@@ -63,6 +72,26 @@ func main() {
 	// Make this the default so lower-level packages (e.g. the SVG font seeder in
 	// internal/escpos) log through the same handler.
 	slog.SetDefault(log)
+
+	// Resolve the listen port and note where it came from. Precedence:
+	// the -port flag wins over $PORT, which wins over the port already implied
+	// by -addr (itself from -addr / $SHORTORDER_ADDR / the platform default).
+	// Whatever wins is folded back into *addr, the single value the server and
+	// mDNS advertisement read downstream.
+	host, addrPort, err := net.SplitHostPort(*addr)
+	if err != nil {
+		log.Error("invalid -addr", "addr", *addr, "err", err)
+		os.Exit(1)
+	}
+	portValue, portSource := addrPort, "-addr"
+	if env := os.Getenv("PORT"); env != "" {
+		portValue, portSource = env, "PORT env"
+	}
+	if flagSet("port") {
+		portValue, portSource = *port, "-port flag"
+	}
+	*addr = net.JoinHostPort(host, portValue)
+	log.Info("listen port configured", "port", portValue, "source", portSource)
 
 	if *list {
 		listPrinters(log)
@@ -216,6 +245,19 @@ func defaultAddr() string {
 		return ":8080"
 	}
 	return ":80"
+}
+
+// flagSet reports whether the named flag was explicitly passed on the command
+// line (as opposed to carrying its default), so an empty -port "" can be told
+// apart from -port being absent.
+func flagSet(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }
 
 func envOr(key, def string) string {
