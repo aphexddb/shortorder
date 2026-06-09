@@ -20,7 +20,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X main.version={{ .Version }}
+      # Embed the literal tag (e.g. v0.2.0) so the version shown in the web UI
+      # exactly matches the GitHub release tag. {{ .Version }} would strip the v.
+      - -X main.version={{ .Tag }}
       - -X main.commit={{ .Commit }}
       - -X main.date={{ .CommitDate }}
     mod_timestamp: "{{ .CommitTimestamp }}" # reproducible builds
