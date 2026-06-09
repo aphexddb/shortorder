@@ -153,6 +153,42 @@ curl -X POST http://127.0.0.1:8080/api/print/document \
   }'
 ```
 
+## `POST /api/print/svg`
+
+Render arbitrary **SVG markup** to a raster and print it — the universal layout
+escape hatch. Where `/api/print/text` and `/api/print/document` lay out receipts
+in the printer's native character grid, this prints *anything you can draw*:
+custom fonts and sizes, logos, free positioning, shapes, rules, gradients,
+embedded images. The SVG is rendered with bundled fonts (no system fonts or
+external programs needed, so output is identical on every host) and printed as a
+1-bit dithered raster.
+
+Prefer native text (`/api/print/text`, `/api/print/document`) when the grid is
+enough: it is crisper, selectable, and a fraction of the bytes. Reach for SVG
+when the layout can't be expressed in fixed-width rows.
+
+The root `<svg>` must declare a `width` and `height` (or a `viewBox`) so it has
+an intrinsic size; it is scaled, preserving aspect ratio, to the target width.
+
+| Field   | Type   | Default  | Notes                                                                 |
+|---------|--------|----------|-----------------------------------------------------------------------|
+| `svg`   | string | —        | **Required.** SVG markup.                                             |
+| `width` | int    | head     | Target raster width in dots. Defaults to and is capped at the head width (`-width`, 576 for 80mm). A smaller value prints narrower and is positioned by `align`. |
+| `align` | string | `center` | `left` \| `center` \| `right` (used when narrower than the head).      |
+| `cut`   | bool   | `true`   | Cut after printing.                                                   |
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/print/svg \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"384\" height=\"120\" viewBox=\"0 0 384 120\"><rect width=\"384\" height=\"120\" fill=\"white\"/><text x=\"192\" y=\"70\" font-family=\"serif\" font-size=\"48\" font-weight=\"bold\" text-anchor=\"middle\">SHORT ORDER</text></svg>",
+    "cut": true
+  }'
+```
+
+A tall/narrow SVG that would rasterize into meters of paper is rejected (the
+rendered height is capped); reduce its height-to-width ratio or `width`.
+
 ## `POST /api/print/qr`
 
 Render `data` as a QR code and print it as a raster bitmap.
@@ -285,8 +321,8 @@ tool loaders. The `servers[0].url` is filled in from the request host.
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server over the HTTP
 streamable transport (stateless). Exposes the tools `list_printers`,
-`print_text`, `print_document`, `print_qr`, `print_barcode`, `print_image`, and
-`cut`, mirroring the REST API. `print_text` takes `text` with the flat style fields for uniform
+`print_text`, `print_document`, `print_svg`, `print_qr`, `print_barcode`,
+`print_image`, and `cut`, mirroring the REST API. `print_text` takes `text` with the flat style fields for uniform
 styling, or an optional `lines` array (each item a styled segment) to mix
 alignment, sizes, and emphasis line by line. Example (JSON-RPC):
 

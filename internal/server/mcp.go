@@ -31,7 +31,8 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 				"cut the paper. To lay out a complete receipt (header, itemized rows with prices "+
 				"flush-right, rules, totals, codes, footer) in one job, prefer print_document. "+
 				"For crisp receipt text prefer native text (print_text / print_document) over "+
-				"embedding text in an image.",
+				"embedding text in an image. To print a layout the character grid can't express "+
+				"(custom fonts, logos, free positioning, shapes), render it as SVG and use print_svg.",
 		),
 	)
 
@@ -108,6 +109,19 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		mcp.WithString("caption", mcp.Description("Optional text printed under the barcode; overrides hri when set.")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintBarcode)
+
+	m.AddTool(mcp.NewTool("print_svg",
+		mcp.WithDescription("Render SVG markup to a raster and print it — the universal layout escape hatch. "+
+			"Use this to print any layout the native character grid can't express: custom fonts and sizes, logos, "+
+			"free positioning, shapes, rules, gradients, embedded images. The SVG is rendered with bundled fonts "+
+			"(no system fonts needed) and printed as a 1-bit dithered raster. For plain receipts prefer "+
+			"print_document / print_text — native text is crisper, selectable, and smaller; reach for SVG when "+
+			"the grid is not enough."),
+		mcp.WithString("svg", mcp.Required(), mcp.Description("SVG markup. The root <svg> must declare a width and height (or a viewBox) so it has an intrinsic size.")),
+		mcp.WithNumber("width", mcp.Description("Target raster width in dots. Defaults to and is capped at the head width; a smaller value prints narrower and is positioned by align.")),
+		mcp.WithString("align", mcp.Description("Horizontal alignment when narrower than the head: left | center | right (default center).")),
+		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
+	), s.mcpPrintSVG)
 
 	m.AddTool(mcp.NewTool("print_image",
 		mcp.WithDescription("Print a base64-encoded image (PNG/JPEG/GIF) as a dithered raster, scaled to fit the head, then optionally cut."),
@@ -419,6 +433,25 @@ func (s *Server) mcpPrintBarcode(ctx context.Context, req mcp.CallToolRequest) (
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	return s.mcpPrint("shortorder-barcode", payload)
+}
+
+func (s *Server) mcpPrintSVG(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svg, err := req.RequireString("svg")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	cut := req.GetBool("cut", true)
+	job := svgRequest{
+		SVG:   svg,
+		Width: req.GetInt("width", 0),
+		Align: req.GetString("align", ""),
+		Cut:   &cut,
+	}
+	data, err := buildSVG(job, s.cfg.Width)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return s.mcpPrint("shortorder-svg", data)
 }
 
 func (s *Server) mcpPrintImage(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

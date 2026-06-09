@@ -63,6 +63,9 @@ func (s *Server) openAPISpec(serverURL string) map[string]any {
 			"/api/print/document": map[string]any{
 				"post": op("printDocument", "Lay out and print a whole receipt as one job", ref("DocumentRequest"), merge(map[string]any{"200": printedResponse}, errorResponses)),
 			},
+			"/api/print/svg": map[string]any{
+				"post": op("printSVG", "Render arbitrary SVG markup to a raster and print it", ref("SVGRequest"), merge(map[string]any{"200": printedResponse}, errorResponses)),
+			},
 			"/api/print/qr": map[string]any{
 				"post": op("printQR", "Render and print a QR code", ref("QRRequest"), merge(map[string]any{"200": printedResponse}, errorResponses)),
 			},
@@ -139,6 +142,12 @@ func (s *Server) openAPISpec(serverURL string) map[string]any {
 					"width": map[string]any{"type": "integer", "description": "Column width in characters; 0/omitted = auto (share remaining width)."},
 					"align": align,
 				}, nil),
+				"SVGRequest": object(map[string]any{
+					"svg":   map[string]any{"type": "string", "description": "SVG markup. The root <svg> must declare width and height (or a viewBox) so it has an intrinsic size."},
+					"width": map[string]any{"type": "integer", "description": "Target raster width in dots; defaults to and is capped at the head width. Smaller prints narrower and is positioned by align."},
+					"align": align,
+					"cut":   cut,
+				}, []string{"svg"}),
 				"QRRequest": object(map[string]any{
 					"data":     map[string]any{"type": "string", "description": "Text or URL to encode."},
 					"scale":    map[string]any{"type": "integer", "default": 8},
