@@ -8,12 +8,13 @@ require (
 	github.com/mark3labs/mcp-go v0.54.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/tdewolff/canvas v0.0.0-20260508100355-63a7228e682d
+	github.com/tdewolff/font v0.0.0-20260527091451-1663e68cb8a4
 	golang.org/x/image v0.42.0
 	golang.org/x/sys v0.46.0
 )
 
 require (
-	codeberg.org/go-pdf/fpdf v0.11.1 // indirect
+	codeberg.org/go-pdf/fpdf v0.12.0 // indirect
 	github.com/BurntSushi/freetype-go v0.0.0-20160129220410-b763ddbfe298 // indirect
 	github.com/BurntSushi/graphics-go v0.0.0-20160129215708-b43f31a4a966 // indirect
 	github.com/BurntSushi/xgb v0.0.0-20210121224620-deaf085860bc // indirect
@@ -33,9 +34,8 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/srwiley/scanx v0.0.0-20190309010443-e94503791388 // indirect
-	github.com/tdewolff/font v0.0.0-20260424075104-b5eeb1e23189 // indirect
 	github.com/tdewolff/minify/v2 v2.24.13 // indirect
-	github.com/tdewolff/parse/v2 v2.8.12 // indirect
+	github.com/tdewolff/parse/v2 v2.8.13 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
 	golang.org/x/mod v0.36.0 // indirect

@@ -49,6 +49,47 @@ func TestSVGImageRendersInk(t *testing.T) {
 	}
 }
 
+// An unresolvable font must NOT crash the process (canvas panics internally) —
+// SVGImage recovers it into a clean error. Uses a guaranteed-absent family so
+// the test holds regardless of host fonts or whether bundled-font seeding ran.
+func TestSVGImageUnknownFontCleanError(t *testing.T) {
+	svg := `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40" viewBox="0 0 100 40">` +
+		`<text x="4" y="28" font-family="zzz-nonexistent-font-9f3a2b" font-size="20">Hi</text></svg>`
+	img, err := SVGImage(svg, 200)
+	if err == nil {
+		t.Fatal("expected a clean error for an unresolvable font, not a successful render")
+	}
+	if img != nil {
+		t.Fatal("expected a nil image alongside the error")
+	}
+	if !strings.Contains(err.Error(), "render svg") {
+		t.Fatalf("expected the recovered render error, got %v", err)
+	}
+}
+
+// Generic families resolve to the bundled fonts (so text renders even on a host
+// with no fonts installed). monospace maps to the bundled mono face.
+func TestSVGImageGenericFamiliesRenderInk(t *testing.T) {
+	for _, fam := range []string{"sans-serif", "serif", "monospace", "Helvetica, Arial, sans-serif"} {
+		svg := `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">` +
+			`<text x="4" y="28" font-family="` + fam + `" font-size="22">Ab12</text></svg>`
+		img, err := SVGImage(svg, 240)
+		if err != nil {
+			t.Fatalf("family %q should render via bundled fonts, got %v", fam, err)
+		}
+		raster := pack(img)
+		dark := 0
+		for _, by := range raster.data {
+			if by != 0 {
+				dark++
+			}
+		}
+		if dark == 0 {
+			t.Fatalf("family %q produced no ink", fam)
+		}
+	}
+}
+
 func TestSVGImageEmpty(t *testing.T) {
 	if _, err := SVGImage("   ", 200); err == nil {
 		t.Fatal("expected error for empty svg")

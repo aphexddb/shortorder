@@ -158,14 +158,22 @@ curl -X POST http://127.0.0.1:8080/api/print/document \
 Render arbitrary **SVG markup** to a raster and print it — the universal layout
 escape hatch. Where `/api/print/text` and `/api/print/document` lay out receipts
 in the printer's native character grid, this prints *anything you can draw*:
-custom fonts and sizes, logos, free positioning, shapes, rules, gradients,
-embedded images. The SVG is rendered with bundled fonts (no system fonts or
-external programs needed, so output is identical on every host) and printed as a
-1-bit dithered raster.
+logos, free positioning, rotation, shapes, rules, gradients, embedded images.
+Printed as a 1-bit dithered raster.
+
+**Fonts.** For determinism the host's fonts are **not** used — text renders in a
+bundled font (the BSD-licensed Go fonts) so the same markup prints identically on
+every host, including a bare appliance with no fonts installed. Consequences:
+every `font-family` (serif, sans-serif, cursive, a specific name, …) maps to that
+one typeface, and `font-weight`/`font-style` are **not** differentiated (no real
+bold or italic). Map `font-family` to a generic (`sans-serif`, `monospace`); for
+crisp, genuinely bold or styled receipt text use `/api/print/text` or
+`/api/print/document` instead. (An SVG that requests a single specific font with
+no generic fallback returns a clean error rather than rendering.)
 
 Prefer native text (`/api/print/text`, `/api/print/document`) when the grid is
-enough: it is crisper, selectable, and a fraction of the bytes. Reach for SVG
-when the layout can't be expressed in fixed-width rows.
+enough: it is crisper, selectable, supports real bold, and is a fraction of the
+bytes. Reach for SVG when the layout can't be expressed in fixed-width rows.
 
 The root `<svg>` must declare a `width` and `height` (or a `viewBox`) so it has
 an intrinsic size; it is scaled, preserving aspect ratio, to the target width.

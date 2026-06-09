@@ -112,11 +112,11 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 
 	m.AddTool(mcp.NewTool("print_svg",
 		mcp.WithDescription("Render SVG markup to a raster and print it — the universal layout escape hatch. "+
-			"Use this to print any layout the native character grid can't express: custom fonts and sizes, logos, "+
-			"free positioning, shapes, rules, gradients, embedded images. The SVG is rendered with bundled fonts "+
-			"(no system fonts needed) and printed as a 1-bit dithered raster. For plain receipts prefer "+
-			"print_document / print_text — native text is crisper, selectable, and smaller; reach for SVG when "+
-			"the grid is not enough."),
+			"Use this to print any layout the native character grid can't express: logos, free positioning, "+
+			"rotation, shapes, rules, gradients, embedded images. Rendered as a 1-bit dithered raster. "+
+			"Text renders in a bundled font for determinism (no system fonts): map font-family to a generic "+
+			"(sans-serif or monospace); font-weight/font-style are NOT differentiated, so for crisp bold or "+
+			"styled receipt text prefer print_document / print_text. Reach for SVG only when the grid is not enough."),
 		mcp.WithString("svg", mcp.Required(), mcp.Description("SVG markup. The root <svg> must declare a width and height (or a viewBox) so it has an intrinsic size.")),
 		mcp.WithNumber("width", mcp.Description("Target raster width in dots. Defaults to and is capped at the head width; a smaller value prints narrower and is positioned by align.")),
 		mcp.WithString("align", mcp.Description("Horizontal alignment when narrower than the head: left | center | right (default center).")),
