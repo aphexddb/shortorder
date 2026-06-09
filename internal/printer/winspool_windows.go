@@ -8,7 +8,7 @@ import (
 
 // Windows USB printer-class device bindings.
 //
-// Budget receipt printers like the Volcora v-WRP2-A1W bind to the in-box
+// Budget Epson-compatible ESC/POS receipt printers commonly bind to the in-box
 // usbprint.sys driver and expose a USB printer device interface
 // (GUID_DEVINTERFACE_USBPRINT) but frequently have NO installed spooler queue.
 // We therefore find them via SetupAPI device-interface enumeration and write raw

@@ -12,7 +12,7 @@ fi
 echo "shortorder installed. Web UI + JSON API on http://<this-host>/"
 echo "  status: sudo systemctl status shortorder"
 echo "  logs:   journalctl -u shortorder -f"
-echo "Plug in a supported USB thermal printer (Volcora v-WRP2-A1W) and it is detected automatically."
+echo "Plug in an Epson-compatible ESC/POS USB thermal printer (e.g. a Volcora v-WRP2-A1W) and it is detected automatically."
 
 # Raspberry Pi appliance setup (best-effort, never fails the install).
 if grep -qi "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then

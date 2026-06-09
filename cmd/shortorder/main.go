@@ -1,5 +1,5 @@
 // Command shortorder runs a long-lived HTTP service that prints text, QR codes,
-// and images to a supported USB thermal receipt printer (the Volcora v-WRP2-A1W)
+// and images to a supported Epson-compatible ESC/POS USB thermal receipt printer
 // and cuts the receipt, all driven over a small JSON API.
 package main
 

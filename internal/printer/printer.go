@@ -1,12 +1,12 @@
 // Package printer detects supported USB thermal receipt printers and sends raw
 // ESC/POS byte streams to them.
 //
-// Only an explicit allowlist of models is supported. The target hardware is the
-// Volcora v-WRP2-A1W; like most budget receipt printers it is an Epson-compatible
-// ESC/POS device and, on this machine, enumerates through the Windows print
-// spooler under an Epson-compatible identity (USB VID 0x04B8 / PID 0x0E20). The
-// allowlist therefore matches on both the branded name and the Epson-compatible
-// identifiers it actually reports.
+// Only an explicit allowlist of models is supported. The target hardware is any
+// Epson-compatible ESC/POS USB receipt printer — the common identity for most
+// budget 80mm/58mm receipt printers. (It's tested with a Volcora v-WRP2-A1W,
+// which enumerates under an Epson-compatible identity: USB VID 0x04B8 /
+// PID 0x0E20.) The allowlist matches on both the Epson-compatible USB
+// identifiers a device reports and a set of known name substrings.
 package printer
 
 import "strings"
@@ -35,7 +35,7 @@ type Model struct {
 // supportedModels is the allowlist. Add a Model here to support more hardware.
 var supportedModels = []Model{
 	{
-		Name:       "Volcora v-WRP2-A1W",
+		Name:       "Epson-compatible ESC/POS",
 		NameMatch:  []string{"volcora", "wrp2", "wrp-2", "v-wrp", "tm-t20", "tm-m30", "tm-t88"},
 		USBVendor:  0x04B8, // Seiko Epson Corp. (Epson-compatible ESC/POS)
 		USBProduct: 0x0E20,

@@ -1,7 +1,7 @@
 // Package escpos builds ESC/POS command streams for thermal receipt printers.
 //
 // ESC/POS is the de-facto command language for receipt printers (Epson and the
-// many compatible clones, including the Volcora v-WRP2-A1W). A print job is just
+// many Epson-compatible clones). A print job is just
 // a byte stream: printable text is emitted verbatim, and control sequences
 // (mostly ESC = 0x1B and GS = 0x1D prefixed) toggle formatting, render bitmaps,
 // and drive the cutter.

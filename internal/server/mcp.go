@@ -26,7 +26,7 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		s.cfg.Version,
 		mcpserver.WithToolCapabilities(true),
 		mcpserver.WithInstructions(
-			"shortorder prints to a USB thermal receipt printer (ESC/POS). "+
+			"shortorder prints to an Epson-compatible ESC/POS USB thermal receipt printer. "+
 				"Call list_printers to confirm a device is connected, then use "+
 				"print_text, print_qr, print_barcode, or print_image to print, and cut to feed and "+
 				"cut the paper. To lay out a complete receipt (header, itemized rows with prices "+
@@ -38,7 +38,7 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 	)
 
 	m.AddTool(mcp.NewTool("list_printers",
-		mcp.WithDescription("List the connected, supported USB thermal printer(s) and the supported models."),
+		mcp.WithDescription("List the connected, supported Epson-compatible ESC/POS USB thermal printer(s) and the supported models."),
 	), s.mcpListPrinters)
 
 	m.AddTool(mcp.NewTool("print_text",
@@ -46,7 +46,7 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 			"For uniform styling, pass text with the top-level style fields. To mix alignment, "+
 			"sizes, and emphasis line by line in one receipt, pass lines instead."),
 		mcp.WithString("text", mcp.Description(`Text to print. Use \n for line breaks. Required unless "lines" is given; ignored when "lines" is given.`)),
-		mcp.WithString("align", mcp.Description("Horizontal alignment: left | center | right (default left).")),
+		mcp.WithString("align", mcp.Enum("left", "center", "right"), mcp.Description("Horizontal alignment: left | center | right (default left).")),
 		mcp.WithBoolean("bold", mcp.Description("Bold / emphasized text (default false).")),
 		mcp.WithNumber("underline", mcp.Description("Underline weight: 0 off, 1 thin, 2 thick (default 0).")),
 		mcp.WithNumber("width", mcp.Description("Character width magnification, 1-8 (default 1).")),
@@ -92,8 +92,8 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		mcp.WithDescription("Render a QR code from text/URL and print it, then optionally cut the paper."),
 		mcp.WithString("data", mcp.Required(), mcp.Description("Text or URL to encode in the QR code.")),
 		mcp.WithNumber("scale", mcp.Description("Module pixel size, ~6-10 prints cleanly (default 8).")),
-		mcp.WithString("recovery", mcp.Description("Error-correction level: low | medium | high | highest (default medium).")),
-		mcp.WithString("align", mcp.Description("Horizontal alignment: left | center | right (default center).")),
+		mcp.WithString("recovery", mcp.Enum("low", "medium", "high", "highest"), mcp.Description("Error-correction level: low | medium | high | highest (default medium).")),
+		mcp.WithString("align", mcp.Enum("left", "center", "right"), mcp.Description("Horizontal alignment: left | center | right (default center).")),
 		mcp.WithString("caption", mcp.Description("Optional text printed under the QR code.")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintQR)
@@ -101,12 +101,12 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 	m.AddTool(mcp.NewTool("print_barcode",
 		mcp.WithDescription("Render a barcode and print it, then optionally cut the paper. Supports 1D codes (CODE128, GS1-128, CODE39, CODE93, EAN-13/8, UPC-A, ITF, ITF-14, Standard 2 of 5, Codabar) and 2D codes (DataMatrix, PDF417)."),
 		mcp.WithString("data", mcp.Required(), mcp.Description("Content to encode. Numeric symbologies (ean13, ean8, upca, itf, itf14, standard2of5) accept digits only.")),
-		mcp.WithString("format", mcp.Description("Symbology: code128 | gs1-128 | code39 | code93 | ean13 | ean8 | upca | itf | itf14 | standard2of5 | codabar | datamatrix | pdf417 (default code128).")),
+		mcp.WithString("format", mcp.Enum(escpos.BarcodeFormats...), mcp.Description("Symbology: code128 | gs1-128 | code39 | code93 | ean13 | ean8 | upca | itf | itf14 | standard2of5 | codabar | datamatrix | pdf417 (default code128).")),
 		mcp.WithNumber("width", mcp.Description("Total width in dots (1D: default ~2 dots/module; 2D: scales the whole symbol). Capped to the head width.")),
 		mcp.WithNumber("height", mcp.Description("Bar height in dots for 1D codes (default 80). Ignored for 2D codes.")),
 		mcp.WithBoolean("wide", mcp.Description("Print larger modules (1D ~4 dots/module, 2D ~10) for dense symbologies or finicky scanners (default false). Ignored when width is set.")),
 		mcp.WithBoolean("hri", mcp.Description("Print the human-readable number under the code, grouped per symbology (EAN-8 4+4, EAN-13 1+6+6, UPC-A 1+5+5+1). Ignored if caption is set.")),
-		mcp.WithString("align", mcp.Description("Horizontal alignment: left | center | right (default center).")),
+		mcp.WithString("align", mcp.Enum("left", "center", "right"), mcp.Description("Horizontal alignment: left | center | right (default center).")),
 		mcp.WithString("caption", mcp.Description("Optional text printed under the barcode; overrides hri when set.")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintBarcode)
@@ -121,7 +121,7 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 			"bold or styled receipt text prefer print_document / print_text. Reach for SVG only when the grid is not enough."),
 		mcp.WithString("svg", mcp.Required(), mcp.Description("SVG markup. The root <svg> must declare a width and height (or a viewBox) so it has an intrinsic size.")),
 		mcp.WithNumber("width", mcp.Description("Target raster width in dots. Defaults to and is capped at the head width; a smaller value prints narrower and is positioned by align.")),
-		mcp.WithString("align", mcp.Description("Horizontal alignment when narrower than the head: left | center | right (default center).")),
+		mcp.WithString("align", mcp.Enum("left", "center", "right"), mcp.Description("Horizontal alignment when narrower than the head: left | center | right (default center).")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintSVG)
 
@@ -139,7 +139,7 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 	m.AddTool(mcp.NewTool("print_image",
 		mcp.WithDescription("Print a base64-encoded image (PNG/JPEG/GIF) as a dithered raster, scaled to fit the head, then optionally cut."),
 		mcp.WithString("image_base64", mcp.Required(), mcp.Description("Base64-encoded PNG, JPEG, or GIF image data.")),
-		mcp.WithString("align", mcp.Description("Horizontal alignment: left | center | right (default center).")),
+		mcp.WithString("align", mcp.Enum("left", "center", "right"), mcp.Description("Horizontal alignment: left | center | right (default center).")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintImage)
 

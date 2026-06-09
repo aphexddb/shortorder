@@ -8,14 +8,14 @@ JSON unless noted. On success print endpoints return `200`:
   "status": "printed",
   "job": "shortorder-text",
   "bytes": 89,
-  "printer": { "name": "EPSON TM-T20II", "model": "Volcora v-WRP2-A1W", "usb": "VID_04B8 PID_0E20" }
+  "printer": { "name": "EPSON TM-T20II", "model": "Epson-compatible ESC/POS", "usb": "VID_04B8 PID_0E20" }
 }
 ```
 
 On failure they return `4xx` (bad request) or `503` (no printer / write failed):
 
 ```json
-{ "status": "error", "error": "no supported printer detected (supported: [Volcora v-WRP2-A1W])" }
+{ "status": "error", "error": "no supported printer detected (supported: [Epson-compatible ESC/POS])" }
 ```
 
 ---
@@ -30,9 +30,9 @@ Lists supported models and the printers currently detected.
 
 ```json
 {
-  "supported": ["Volcora v-WRP2-A1W"],
+  "supported": ["Epson-compatible ESC/POS"],
   "detected": [
-    { "name": "EPSON TM-T20II", "model": "Volcora v-WRP2-A1W", "usb": "VID_04B8 PID_0E20" }
+    { "name": "EPSON TM-T20II", "model": "Epson-compatible ESC/POS", "usb": "VID_04B8 PID_0E20" }
   ]
 }
 ```

@@ -22,8 +22,9 @@ curl -X POST http://localhost/api/print/text \
 
 ## What it is
 
-A REST and MCP interface to an ESC/POS USB receipt printer: the Volcora
-v-WRP2-A1W, an Epson TM-series, or most compatible clones. You can drive it from an LLM agent, a shell script, a smart-home automation, or any language that can make an HTTP request.
+A REST and MCP interface to an Epson-compatible ESC/POS USB receipt printer — the
+common identity shared by most inexpensive 80mm/58mm receipt printers (Epson
+TM-series, Volcora, and compatible clones). You can drive it from an LLM agent, a shell script, a smart-home automation, or any language that can make an HTTP request.
 
 A few things people use it for:
 
@@ -57,8 +58,8 @@ HTTP (streamable transport) at `POST /mcp`, live whenever the service is running
 
 | Printer | Interface | Status |
 |---------|-----------|--------|
-| Volcora v-WRP2-A1W | USB (ESC/POS) | Supported |
-| Epson TM-series and compatible clones | USB (ESC/POS) | Works (same USB identity) |
+| Epson TM-series & Epson-compatible ESC/POS | USB (ESC/POS) | Supported |
+| Volcora v-WRP2-A1W and similar clones | USB (ESC/POS) | Tested (same Epson USB identity) |
 
 Most inexpensive 80mm and 58mm USB receipt printers are ESC/POS and Epson-compatible. To add one, put a **Model** (USB vendor/product ID and/or a name substring) in the allowlist in
 [`internal/printer/printer.go`](internal/printer/printer.go). The print path is already shared across models.
@@ -294,7 +295,7 @@ make tag V=v0.1.0   # tag + push, CI cuts a GitHub release
 
 **Does it need printer drivers?** No. shortorder talks to the printer's raw USB endpoint directly. There's no driver, print queue, or spooler to configure.
 
-**What printers are supported?** The Volcora v-WRP2-A1W and Epson-compatible ESC/POS USB receipt printers. Adding a model is a one-line allowlist change.
+**What printers are supported?** Epson-compatible ESC/POS USB receipt printers — Epson TM-series and the many clones that share Epson's USB identity (tested with a Volcora v-WRP2-A1W). Most budget 80mm/58mm receipt printers qualify. Adding a model is a one-line allowlist change.
 
 **Which platforms?** Printing works on Windows and Linux, including the Raspberry Pi. The binary also builds and runs on macOS, where the print path is a stub pending a CUPS backend.
 
