@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image"
+	"strconv"
 
 	mcp "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
@@ -27,8 +28,10 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 			"shortorder prints to a USB thermal receipt printer (ESC/POS). "+
 				"Call list_printers to confirm a device is connected, then use "+
 				"print_text, print_qr, print_barcode, or print_image to print, and cut to feed and "+
-				"cut the paper. For crisp receipt text prefer print_text over embedding "+
-				"text in an image.",
+				"cut the paper. To lay out a complete receipt (header, itemized rows with prices "+
+				"flush-right, rules, totals, codes, footer) in one job, prefer print_document. "+
+				"For crisp receipt text prefer native text (print_text / print_document) over "+
+				"embedding text in an image.",
 		),
 	)
 
@@ -65,6 +68,23 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		mcp.WithNumber("feed", mcp.Description("Extra blank lines fed after the text (default 0).")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintText)
+
+	m.AddTool(mcp.NewTool("print_document",
+		mcp.WithDescription("Print a whole receipt as one job: an ordered list of layout elements rendered "+
+			"top to bottom with a single cut at the end. This is the way to lay out a real receipt — header, "+
+			"itemized rows with prices flush-right, rules, totals, a barcode/QR, footer — using the printer's "+
+			"crisp native text. Element types: text (wrapped paragraph), row (label left + value right), "+
+			"columns (one row of N cells), table (many rows sharing column defs), rule (horizontal line), "+
+			"feed (blank space), qr, barcode, image. Column layout (row/columns/table/rule) is accurate at the "+
+			"default text size; use enlarged text only for centered headers, not columns."),
+		mcp.WithNumber("columns", mcp.Description("Line width in characters. Default derives from the head width (80mm=48, 58mm=32).")),
+		mcp.WithArray("elements", mcp.Required(),
+			mcp.Description("Ordered list of layout elements. Each item has a \"type\" plus the fields for that type."),
+			mcp.Items(docElementSchema()),
+		),
+		mcp.WithNumber("feed", mcp.Description("Extra blank lines fed after the document (default 0).")),
+		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
+	), s.mcpPrintDocument)
 
 	m.AddTool(mcp.NewTool("print_qr",
 		mcp.WithDescription("Render a QR code from text/URL and print it, then optionally cut the paper."),
@@ -141,6 +161,165 @@ func (s *Server) mcpPrintText(ctx context.Context, req mcp.CallToolRequest) (*mc
 		Cut:       &cut,
 	}
 	return s.mcpPrint("shortorder-text", buildText(job))
+}
+
+func (s *Server) mcpPrintDocument(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	elements := parseDocElements(req.GetArguments()["elements"])
+	if len(elements) == 0 {
+		return mcp.NewToolResultError("elements is required and must be non-empty"), nil
+	}
+	cut := req.GetBool("cut", true)
+	job := documentRequest{
+		Columns:  req.GetInt("columns", 0),
+		Elements: elements,
+		Feed:     req.GetInt("feed", 0),
+		Cut:      &cut,
+	}
+	data, err := buildDocument(job, s.cfg.Width)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return s.mcpPrint("shortorder-document", data)
+}
+
+// parseDocElements converts the MCP "elements" argument (a JSON array of
+// objects) into docElements, mirroring how the HTTP handler decodes the same
+// shape from JSON. Non-object entries are skipped; missing fields take their
+// zero value.
+func parseDocElements(v any) []docElement {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]docElement, 0, len(arr))
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, docElement{
+			Type:        mapString(m, "type"),
+			Text:        mapString(m, "text"),
+			Align:       mapString(m, "align"),
+			Bold:        mapBool(m, "bold"),
+			Underline:   byte(mapInt(m, "underline")),
+			Width:       mapInt(m, "width"),
+			Height:      mapInt(m, "height"),
+			Left:        mapString(m, "left"),
+			Right:       mapString(m, "right"),
+			Char:        mapString(m, "char"),
+			Lines:       mapInt(m, "lines"),
+			Columns:     parseDocColumns(m["columns"]),
+			Cells:       toStringSlice(m["cells"]),
+			Rows:        parseRows(m["rows"]),
+			Gap:         mapInt(m, "gap"),
+			Data:        mapString(m, "data"),
+			Scale:       mapInt(m, "scale"),
+			Recovery:    mapString(m, "recovery"),
+			Caption:     mapString(m, "caption"),
+			Format:      mapString(m, "format"),
+			Wide:        mapBool(m, "wide"),
+			HRI:         mapBool(m, "hri"),
+			ImageBase64: mapString(m, "image_base64"),
+		})
+	}
+	return out
+}
+
+func parseDocColumns(v any) []docColumn {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]docColumn, 0, len(arr))
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, docColumn{Width: mapInt(m, "width"), Align: mapString(m, "align")})
+	}
+	return out
+}
+
+func parseRows(v any) [][]string {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([][]string, 0, len(arr))
+	for _, item := range arr {
+		out = append(out, toStringSlice(item))
+	}
+	return out
+}
+
+// toStringSlice coerces a JSON array into []string, stringifying numbers and
+// bools so a caller that passes a numeric cell (e.g. a quantity) still works.
+func toStringSlice(v any) []string {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, item := range arr {
+		switch s := item.(type) {
+		case string:
+			out = append(out, s)
+		case float64:
+			out = append(out, strconv.FormatFloat(s, 'f', -1, 64))
+		case bool:
+			out = append(out, strconv.FormatBool(s))
+		case nil:
+			out = append(out, "")
+		default:
+			out = append(out, fmt.Sprint(item))
+		}
+	}
+	return out
+}
+
+// docElementSchema is the JSON Schema for one element in the print_document
+// "elements" array. It is intentionally permissive (no per-type required
+// fields) since one schema covers every element type.
+func docElementSchema() map[string]any {
+	align := map[string]any{"type": "string", "enum": []string{"left", "center", "right"}}
+	column := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"width": map[string]any{"type": "number", "description": "Column width in characters; 0 or omitted = auto (share remaining width)."},
+			"align": align,
+		},
+	}
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"type":         map[string]any{"type": "string", "enum": []string{"text", "row", "columns", "table", "rule", "feed", "qr", "barcode", "image"}, "description": "Element type (default text)."},
+			"text":         map[string]any{"type": "string", "description": "text element: content; \\n for hard breaks. Wrapped to the line width at default size."},
+			"align":        align,
+			"bold":         map[string]any{"type": "boolean"},
+			"underline":    map[string]any{"type": "number", "enum": []int{0, 1, 2}},
+			"width":        map[string]any{"type": "number", "description": "text element: width size magnification 1-8 (enlarged text isn't column-wrapped)."},
+			"height":       map[string]any{"type": "number", "description": "text element: height size magnification 1-8."},
+			"left":         map[string]any{"type": "string", "description": "row element: left/label text."},
+			"right":        map[string]any{"type": "string", "description": "row element: right/value text, kept flush to the right edge."},
+			"char":         map[string]any{"type": "string", "description": "rule element: single fill character (default '-')."},
+			"lines":        map[string]any{"type": "number", "description": "feed element: number of blank lines (default 1)."},
+			"columns":      map[string]any{"type": "array", "items": column, "description": "columns/table element: per-column width and alignment. Omit for equal auto columns."},
+			"cells":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "columns element: one row of cell texts."},
+			"rows":         map[string]any{"type": "array", "items": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "description": "table element: rows of cell texts."},
+			"gap":          map[string]any{"type": "number", "description": "columns/table element: blank cells between columns (default 1)."},
+			"data":         map[string]any{"type": "string", "description": "qr/barcode element: content to encode."},
+			"scale":        map[string]any{"type": "number", "description": "qr element: module pixel size (default 8)."},
+			"recovery":     map[string]any{"type": "string", "enum": []string{"low", "medium", "high", "highest"}, "description": "qr element: error-correction level."},
+			"caption":      map[string]any{"type": "string", "description": "qr/barcode element: text printed under the code."},
+			"format":       map[string]any{"type": "string", "description": "barcode element: symbology (code128, ean13, upca, datamatrix, pdf417, ...; default code128)."},
+			"wide":         map[string]any{"type": "boolean", "description": "barcode element: larger modules for dense codes / finicky scanners."},
+			"hri":          map[string]any{"type": "boolean", "description": "barcode element: print the human-readable number under the code."},
+			"image_base64": map[string]any{"type": "string", "description": "image element: base64 PNG/JPEG/GIF, scaled to fit the head."},
+		},
+		"required": []string{"type"},
+	}
 }
 
 // parseSegments converts the MCP "lines" argument (a JSON array of objects) into

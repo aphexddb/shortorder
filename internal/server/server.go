@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /api/printers", s.handlePrinters)
 	mux.HandleFunc("POST /api/print/text", s.handleText)
+	mux.HandleFunc("POST /api/print/document", s.handleDocument)
 	mux.HandleFunc("POST /api/print/qr", s.handleQR)
 	mux.HandleFunc("POST /api/print/barcode", s.handleBarcode)
 	mux.HandleFunc("POST /api/print/image", s.handleImage)
@@ -267,23 +268,31 @@ func (s *Server) handleQR(w http.ResponseWriter, r *http.Request) {
 
 // buildQR renders a QR job to ESC/POS at the given head width.
 func buildQR(req qrRequest, width int) ([]byte, error) {
+	b := escpos.New()
+	if err := writeQR(b, req, width); err != nil {
+		return nil, err
+	}
+	if cutOrDefault(req.Cut) {
+		b.Cut()
+	}
+	return b.Bytes(), nil
+}
+
+// writeQR renders a QR code into an existing builder (no init, no cut) so both
+// the standalone QR job and the document model emit identical bytes.
+func writeQR(b *escpos.Builder, req qrRequest, width int) error {
 	img, err := escpos.QRImage(req.Data, req.Scale, parseRecovery(req.Recovery))
 	if err != nil {
-		return nil, fmt.Errorf("render qr: %w", err)
+		return fmt.Errorf("render qr: %w", err)
 	}
 	img = escpos.FitWidth(img, width)
-
-	b := escpos.New()
 	b.Align(parseAlignDefault(req.Align, escpos.AlignCenter))
 	b.Image(img)
 	if req.Caption != "" {
 		b.Feed(1).Line(req.Caption)
 	}
 	b.Align(escpos.AlignLeft)
-	if cutOrDefault(req.Cut) {
-		b.Cut()
-	}
-	return b.Bytes(), nil
+	return nil
 }
 
 // barcodeRequest is the body for POST /api/print/barcode.
@@ -319,9 +328,22 @@ func (s *Server) handleBarcode(w http.ResponseWriter, r *http.Request) {
 // buildBarcode renders a barcode job to ESC/POS at the given head width. Pure
 // (no I/O) so the HTTP handler and the MCP tool share one code path.
 func buildBarcode(req barcodeRequest, width int) ([]byte, error) {
+	b := escpos.New()
+	if err := writeBarcode(b, req, width); err != nil {
+		return nil, err
+	}
+	if cutOrDefault(req.Cut) {
+		b.Cut()
+	}
+	return b.Bytes(), nil
+}
+
+// writeBarcode renders a barcode into an existing builder (no init, no cut),
+// shared by the standalone barcode job and the document model.
+func writeBarcode(b *escpos.Builder, req barcodeRequest, width int) error {
 	img, err := escpos.BarcodeImage(req.Data, req.Format, req.Width, req.Height, req.Wide)
 	if err != nil {
-		return nil, fmt.Errorf("render barcode: %w", err)
+		return fmt.Errorf("render barcode: %w", err)
 	}
 	img = escpos.FitWidth(img, width)
 
@@ -331,17 +353,13 @@ func buildBarcode(req barcodeRequest, width int) ([]byte, error) {
 		caption = escpos.BarcodeHRI(req.Format, req.Data)
 	}
 
-	b := escpos.New()
 	b.Align(parseAlignDefault(req.Align, escpos.AlignCenter))
 	b.Image(img)
 	if caption != "" {
 		b.Feed(1).Line(caption)
 	}
 	b.Align(escpos.AlignLeft)
-	if cutOrDefault(req.Cut) {
-		b.Cut()
-	}
-	return b.Bytes(), nil
+	return nil
 }
 
 func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
@@ -356,15 +374,21 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 // buildImageRaster renders an already-decoded image to ESC/POS, scaled to fit
 // the head width.
 func buildImageRaster(img image.Image, width int, align escpos.Align, cut bool) []byte {
-	img = escpos.FitWidth(img, width)
 	b := escpos.New()
-	b.Align(align)
-	b.Image(img)
-	b.Align(escpos.AlignLeft)
+	writeImage(b, img, width, align)
 	if cut {
 		b.Cut()
 	}
 	return b.Bytes()
+}
+
+// writeImage scales img to the head width and renders it into an existing
+// builder (no init, no cut), shared by the image job and the document model.
+func writeImage(b *escpos.Builder, img image.Image, width int, align escpos.Align) {
+	img = escpos.FitWidth(img, width)
+	b.Align(align)
+	b.Image(img)
+	b.Align(escpos.AlignLeft)
 }
 
 // rawRequest carries a base64-encoded ESC/POS stream.

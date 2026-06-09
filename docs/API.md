@@ -91,6 +91,68 @@ curl -X POST http://127.0.0.1:8080/api/print/text \
   }'
 ```
 
+## `POST /api/print/document`
+
+Lay out and print a **whole receipt as one job** — an ordered list of layout
+elements rendered top to bottom with a single cut at the end. Unlike the other
+print endpoints (each of which is its own job that cuts), a document composes a
+header, an itemized table with prices flush-right, rules, totals, a barcode/QR,
+and a footer into one receipt, using the printer's crisp native monospace text.
+
+Layout happens over a fixed character grid. The line width in characters comes
+from `columns`, or is derived from the head width when omitted (80mm = 48,
+58mm = 32). Column-aware elements (`row`, `columns`, `table`, `rule`) are
+accurate at the default text size; use enlarged text only for centered headers.
+
+| Field      | Type   | Default | Notes                                                       |
+|------------|--------|---------|-------------------------------------------------------------|
+| `columns`  | int    | derived | Line width in characters. `0`/omitted derives from the head width. |
+| `elements` | array  | —       | **Required.** Ordered layout elements (see below).          |
+| `feed`     | int    | `0`     | Extra blank lines after the document.                       |
+| `cut`      | bool   | `true`  | Cut once, after the whole document.                         |
+
+### Elements
+
+Each element is an object with a `type` and the fields for that type:
+
+| `type`    | Fields                                                  | Renders                                              |
+|-----------|---------------------------------------------------------|------------------------------------------------------|
+| `text`    | `text`, `align`, `bold`, `underline`, `width`, `height` | A word-wrapped paragraph. Wrapped to the line width at default size; `width`/`height` (1–8) enlarge it (and disable wrapping). |
+| `row`     | `left`, `right`, `bold`, `underline`                    | A label left, a value flush right (`Cheeseburger      $8.50`). Left text wraps; the value stays on the last line. |
+| `columns` | `cells`, `columns`, `gap`, `bold`, `underline`          | One row of N cells. Each cell wraps within its column. |
+| `table`   | `rows`, `columns`, `gap`, `bold`, `underline`           | Many rows sharing one set of column definitions.     |
+| `rule`    | `char`                                                  | A horizontal rule across the line (default `-`).     |
+| `feed`    | `lines`                                                 | Blank vertical space (default 1 line).               |
+| `qr`      | `data`, `scale`, `recovery`, `align`, `caption`         | A QR code (same rendering as `/api/print/qr`).       |
+| `barcode` | `data`, `format`, `wide`, `hri`, `align`, `caption`     | A 1D/2D barcode (same rendering as `/api/print/barcode`). |
+| `image`   | `image_base64`, `align`                                 | A base64 PNG/JPEG/GIF raster, scaled to fit the head. |
+
+A column definition (`columns[]`) is `{ "width": <cells>, "align": "left|center|right" }`.
+A `width` of `0` (or omitted) is **auto**: the remaining line width is split
+evenly among the auto columns. `gap` is the number of blank cells between
+columns (default `1`).
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/print/document \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "elements": [
+      {"type":"text","text":"SHORT ORDER CAFE","align":"center","bold":true,"width":2,"height":2},
+      {"type":"text","text":"123 Main St","align":"center"},
+      {"type":"rule"},
+      {"type":"table",
+       "columns":[{"width":3},{"width":0},{"width":8,"align":"right"}],
+       "rows":[["2","Coffee","$6.00"],["1","Blueberry Muffin","$3.25"]]},
+      {"type":"rule","char":"="},
+      {"type":"row","left":"TOTAL","right":"$9.25","bold":true},
+      {"type":"feed","lines":1},
+      {"type":"barcode","format":"code128","data":"ORD-1042","hri":true},
+      {"type":"text","text":"Thank you!","align":"center"}
+    ],
+    "cut": true
+  }'
+```
+
 ## `POST /api/print/qr`
 
 Render `data` as a QR code and print it as a raster bitmap.
@@ -223,8 +285,8 @@ tool loaders. The `servers[0].url` is filled in from the request host.
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server over the HTTP
 streamable transport (stateless). Exposes the tools `list_printers`,
-`print_text`, `print_qr`, `print_barcode`, `print_image`, and `cut`, mirroring
-the REST API. `print_text` takes `text` with the flat style fields for uniform
+`print_text`, `print_document`, `print_qr`, `print_barcode`, `print_image`, and
+`cut`, mirroring the REST API. `print_text` takes `text` with the flat style fields for uniform
 styling, or an optional `lines` array (each item a styled segment) to mix
 alignment, sizes, and emphasis line by line. Example (JSON-RPC):
 
