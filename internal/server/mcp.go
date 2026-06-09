@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image"
 	"strconv"
@@ -123,6 +124,17 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		mcp.WithString("align", mcp.Description("Horizontal alignment when narrower than the head: left | center | right (default center).")),
 		mcp.WithBoolean("cut", mcp.Description("Cut the paper after printing (default true).")),
 	), s.mcpPrintSVG)
+
+	m.AddTool(mcp.NewTool("print_sample_receipt",
+		mcp.WithDescription("Print the built-in sample receipt: a fully laid-out, itemized receipt (header, rows with "+
+			"prices flush-right, rules, totals, a code, footer) built into the binary. Takes no arguments. Use it to "+
+			"see what print_document produces without authoring a payload."),
+	), s.mcpPrintSampleReceipt)
+
+	m.AddTool(mcp.NewTool("print_sample_svg",
+		mcp.WithDescription("Print the built-in SVG showcase: a rich SVG demonstrating fonts, shapes, and layout, built "+
+			"into the binary. Takes no arguments. Use it to see what print_svg produces without authoring a payload."),
+	), s.mcpPrintSampleSVG)
 
 	m.AddTool(mcp.NewTool("print_image",
 		mcp.WithDescription("Print a base64-encoded image (PNG/JPEG/GIF) as a dithered raster, scaled to fit the head, then optionally cut."),
@@ -471,6 +483,26 @@ func (s *Server) mcpPrintImage(ctx context.Context, req mcp.CallToolRequest) (*m
 	align := parseAlignDefault(req.GetString("align", ""), escpos.AlignCenter)
 	cut := req.GetBool("cut", true)
 	return s.mcpPrint("shortorder-image", buildImageRaster(img, s.cfg.Width, align, cut))
+}
+
+func (s *Server) mcpPrintSampleReceipt(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var job documentRequest
+	if err := json.Unmarshal(sampleReceiptJSON, &job); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("embedded sample receipt is invalid: %v", err)), nil
+	}
+	data, err := buildDocument(job, s.cfg.Width)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return s.mcpPrint("shortorder-sample-receipt", data)
+}
+
+func (s *Server) mcpPrintSampleSVG(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	data, err := buildSVG(svgRequest{SVG: string(sampleShowcaseSVG)}, s.cfg.Width)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return s.mcpPrint("shortorder-sample-svg", data)
 }
 
 func (s *Server) mcpCut(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -166,6 +166,10 @@ curl -X POST http://localhost/api/print/barcode \
 # Any PNG, JPEG, or GIF, scaled to fit and dithered
 curl -X POST 'http://localhost/api/print/image?align=center' \
   --data-binary @logo.png -H 'Content-Type: application/octet-stream'
+
+# Built-in samples (no body): a full receipt and an SVG showcase
+curl -X POST http://localhost/api/print/sample/receipt
+curl -X POST http://localhost/api/print/sample/svg
 ```
 
 ## Build from source
@@ -211,6 +215,8 @@ and binds it directly). On Windows it defaults to 8080 to avoid the common
 | `POST /api/print/barcode` | Render and print a 1D/2D barcode (incl. DataMatrix, PDF417) |
 | `POST /api/print/svg`   | Render arbitrary SVG markup to a raster and print it |
 | `POST /api/print/image` | Print a PNG/JPEG/GIF as a dithered raster      |
+| `POST /api/print/sample/receipt` | Print the built-in sample receipt (no body) |
+| `POST /api/print/sample/svg` | Print the built-in SVG showcase (no body) |
 | `POST /api/print/raw`   | Send a raw ESC/POS byte stream                 |
 | `POST /api/cut`         | Feed and cut                                   |
 | `GET  /openapi.json`    | OpenAPI 3.1 descriptor (also `/.well-known/openapi.json`) |

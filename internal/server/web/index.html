@@ -141,6 +141,11 @@
         <label class="inline"><input id="bc-hri" type="checkbox"> numbers</label>
         <button id="btn-bc">Print barcode</button>
       </div>
+      <div class="row">
+        <label class="inline">Samples:</label>
+        <button class="alt" id="btn-sample-receipt">Print sample receipt</button>
+        <button class="alt" id="btn-sample-svg">Print showcase SVG</button>
+      </div>
       <div id="result"></div>
     </div>
   </section>
@@ -154,7 +159,7 @@
         <dt>OpenAPI</dt><dd><a id="openapi-link" href="/openapi.json"><span id="openapi-url"></span></a></dd>
         <dt>mDNS / DNS-SD</dt><dd><code>_shortorder._tcp</code> &nbsp;(<code>dns-sd -B _shortorder._tcp</code>)</dd>
       </dl>
-      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_qr</code>, <code>print_barcode</code>, <code>print_image</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
+      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_qr</code>, <code>print_barcode</code>, <code>print_image</code>, <code>print_sample_receipt</code>, <code>print_sample_svg</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
     </div>
   </section>
 
@@ -249,6 +254,8 @@ $("#btn-qr").onclick = () =>
 $("#btn-bc").onclick = () =>
   post("/api/print/barcode", { data: $("#bc-input").value, format: $("#bc-format").value, wide: $("#bc-wide").checked, hri: $("#bc-hri").checked, cut: true });
 $("#btn-cut").onclick = () => post("/api/cut");
+$("#btn-sample-receipt").onclick = () => post("/api/print/sample/receipt", {});
+$("#btn-sample-svg").onclick = () => post("/api/print/sample/svg", {});
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

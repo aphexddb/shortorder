@@ -66,6 +66,12 @@ func (s *Server) openAPISpec(serverURL string) map[string]any {
 			"/api/print/svg": map[string]any{
 				"post": op("printSVG", "Render arbitrary SVG markup to a raster and print it", ref("SVGRequest"), merge(map[string]any{"200": printedResponse}, errorResponses)),
 			},
+			"/api/print/sample/receipt": map[string]any{
+				"post": op("printSampleReceipt", "Print the built-in sample receipt", nil, merge(map[string]any{"200": printedResponse}, errorResponses)),
+			},
+			"/api/print/sample/svg": map[string]any{
+				"post": op("printSampleSVG", "Print the built-in SVG showcase", nil, merge(map[string]any{"200": printedResponse}, errorResponses)),
+			},
 			"/api/print/qr": map[string]any{
 				"post": op("printQR", "Render and print a QR code", ref("QRRequest"), merge(map[string]any{"200": printedResponse}, errorResponses)),
 			},

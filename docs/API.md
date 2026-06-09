@@ -199,6 +199,28 @@ curl -X POST http://127.0.0.1:8080/api/print/svg \
 A tall/narrow SVG that would rasterize into meters of paper is rejected (the
 rendered height is capped); reduce its height-to-width ratio or `width`.
 
+## `POST /api/print/sample/receipt`
+
+Print the built-in sample receipt — a fully laid-out document (header, itemized
+table, totals, barcode, and QR) embedded in the binary. Renders through the same
+pipeline as `/api/print/document`, so the output shows what that endpoint
+produces without authoring a payload. Takes **no parameters**; any request body
+is ignored.
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/print/sample/receipt
+```
+
+## `POST /api/print/sample/svg`
+
+Print the built-in SVG showcase — a rich sample of SVG markup embedded in the
+binary, rendered through the same pipeline as `/api/print/svg`. Takes **no
+parameters**; any request body is ignored.
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/print/sample/svg
+```
+
 ## `POST /api/print/qr`
 
 Render `data` as a QR code and print it as a raster bitmap.

@@ -62,6 +62,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/print/text", s.handleText)
 	mux.HandleFunc("POST /api/print/document", s.handleDocument)
 	mux.HandleFunc("POST /api/print/svg", s.handleSVG)
+	mux.HandleFunc("POST /api/print/sample/receipt", s.handleSampleReceipt)
+	mux.HandleFunc("POST /api/print/sample/svg", s.handleSampleSVG)
 	mux.HandleFunc("POST /api/print/qr", s.handleQR)
 	mux.HandleFunc("POST /api/print/barcode", s.handleBarcode)
 	mux.HandleFunc("POST /api/print/image", s.handleImage)
