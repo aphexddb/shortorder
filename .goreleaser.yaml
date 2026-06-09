@@ -40,9 +40,12 @@ archives:
         formats: [zip]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    # Ship the binary plus the Apache-2.0 LICENSE and NOTICE only.
+    # Listing files explicitly overrides GoReleaser's defaults, so no
+    # README or CHANGELOG is bundled.
     files:
-      - README.md
-      - docs/*
+      - LICENSE
+      - NOTICE
 
 checksum:
   name_template: checksums.txt
