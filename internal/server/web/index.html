@@ -20,8 +20,11 @@
     border-bottom: 1px solid var(--border); background: var(--panel);
     position: sticky; top: 0; z-index: 5;
   }
-  header h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
-  header h1 .tilde { color: var(--accent); }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
+  header h1 .logo { font-size: 22px; line-height: 1; }
+  .gh { display: inline-flex; align-items: center; color: var(--muted); }
+  .gh:hover { color: var(--text); }
+  .gh svg { width: 22px; height: 22px; fill: currentColor; display: block; }
   .pill {
     font: 12px/1 var(--mono); padding: 5px 9px; border-radius: 999px;
     border: 1px solid var(--border); color: var(--muted); background: var(--panel2);
@@ -93,9 +96,12 @@
 </head>
 <body>
 <header>
-  <h1><span class="tilde">~</span> shortorder</h1>
+  <h1><span class="logo">🧾</span> shortorder</h1>
   <span id="status" class="pill">checking…</span>
   <span class="ver" id="version"></span>
+  <a class="gh" href="https://github.com/aphexddb/shortorder" target="_blank" rel="noopener" aria-label="GitHub repository">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+  </a>
 </header>
 
 <main>
@@ -159,7 +165,7 @@
         <dt>OpenAPI</dt><dd><a id="openapi-link" href="/openapi.json"><span id="openapi-url"></span></a></dd>
         <dt>mDNS / DNS-SD</dt><dd><code>_shortorder._tcp</code> &nbsp;(<code>dns-sd -B _shortorder._tcp</code>)</dd>
       </dl>
-      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_qr</code>, <code>print_barcode</code>, <code>print_image</code>, <code>print_sample_receipt</code>, <code>print_sample_svg</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
+      <p class="supported">Tools: <code>list_printers</code>, <code>print_text</code>, <code>print_document</code>, <code>print_qr</code>, <code>print_barcode</code>, <code>print_svg</code>, <code>print_image</code>, <code>print_sample_receipt</code>, <code>print_sample_svg</code>, <code>cut</code> — discovered automatically by MCP-aware agents.</p>
     </div>
   </section>
 
@@ -269,18 +275,47 @@ const endpoints = [
     ex: `curl ${base}/api/printers` },
   { m: "POST", p: "/api/print/text", d: "Print formatted text",
     params: [
-      ["text", "string", "required", "Text to print. \\n for line breaks."],
+      ["text", "string", "required", "Required unless lines given; ignored when lines set. \\n for line breaks."],
       ["align", "string", "left", "left | center | right"],
       ["bold", "bool", "false", "Emphasized printing"],
       ["underline", "int", "0", "0 off, 1 thin, 2 thick"],
       ["width", "int", "1", "Char width magnification 1–8"],
       ["height", "int", "1", "Char height magnification 1–8"],
+      ["lines", "array", "—", "Per-line styling: ordered styled segments, each on its own line. Overrides text."],
       ["feed", "int", "0", "Extra blank lines after text"],
       ["cut", "bool", "true", "Cut after printing"],
     ],
     ex: `curl -X POST ${base}/api/print/text \\
   -H 'Content-Type: application/json' \\
   -d '{"text":"ORDER #42","align":"center","width":2,"height":2,"cut":true}'` },
+  { m: "POST", p: "/api/print/document", d: "Lay out and print a whole receipt as one job",
+    params: [
+      ["columns", "int", "derived", "Line width in chars; 0/omitted derives from head (80mm 48, 58mm 32)"],
+      ["elements", "array", "required", "Ordered layout elements (see note)"],
+      ["feed", "int", "0", "Extra blank lines after the document"],
+      ["cut", "bool", "true", "Cut once, after the whole document"],
+    ],
+    note: "Each element is { type, … }. Types: text (wrapped paragraph), row (label left + value flush-right), columns (one row of N cells), table (rows sharing column defs), rule (horizontal line), feed (blank space), qr, barcode, image. Column-aware elements are accurate at the default text size.",
+    ex: `curl -X POST ${base}/api/print/document \\
+  -H 'Content-Type: application/json' \\
+  -d '{"elements":[
+    {"type":"text","text":"SHORT ORDER","align":"center","bold":true,"width":2,"height":2},
+    {"type":"rule"},
+    {"type":"row","left":"Coffee","right":"$6.00"},
+    {"type":"rule","char":"="},
+    {"type":"row","left":"TOTAL","right":"$6.00","bold":true}
+  ]}'` },
+  { m: "POST", p: "/api/print/svg", d: "Render SVG markup to a raster and print it",
+    params: [
+      ["svg", "string", "required", "SVG markup; root <svg> needs a width/height or viewBox"],
+      ["width", "int", "head", "Target width in dots, capped to head; narrower is positioned by align"],
+      ["align", "string", "center", "left | center | right (when narrower than the head)"],
+      ["cut", "bool", "true", "Cut after printing"],
+    ],
+    note: "The layout escape hatch — prints anything you can draw (logos, shapes, free positioning) as a 1-bit dithered raster. Text uses fonts bundled in the binary (Roboto, Gelasio, Go Mono); font-weight/style aren't differentiated, so prefer text/document for crisp bold. Over-tall SVGs are rejected.",
+    ex: `curl -X POST ${base}/api/print/svg \\
+  -H 'Content-Type: application/json' \\
+  -d '{"svg":"<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"384\\" height=\\"120\\"><rect width=\\"384\\" height=\\"120\\" fill=\\"white\\"/><text x=\\"192\\" y=\\"70\\" font-family=\\"serif\\" font-size=\\"48\\" text-anchor=\\"middle\\">SHORT ORDER</text></svg>"}'` },
   { m: "POST", p: "/api/print/qr", d: "Render and print a QR code",
     params: [
       ["data", "string", "required", "Text / URL to encode"],
