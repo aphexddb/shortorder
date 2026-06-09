@@ -2,7 +2,7 @@
 
 **A tiny service that prints to a USB thermal receipt printer.** 
 
-shortorder is an AI-enabled thermal receipt printer. It runs as a small HTTP service that lets AI agents (and ordinary scripts) print to a USB thermal printer. Send it a request and it prints text, QR codes, barcodes, or images, then cuts the receipt.
+shortorder is an AI-enabled thermal receipt printer. It runs as a small HTTP service that lets AI agents (and ordinary scripts) print to a USB thermal printer. Send it a request and it prints text, full receipt layouts, QR codes, barcodes, images, or arbitrary SVG, then cuts the receipt.
 
 It ships an MCP server, so an LLM agent can discover the printer and use it as a tool without writing an integration. There's also a plain REST API for everything else. It's a single Go binary with no dependencies, no printer drivers, and no cloud, and it runs on Windows, Linux, and the Raspberry Pi.
 
@@ -36,7 +36,9 @@ A few things people use it for:
 
 This is the part that makes it AI-enabled. There are three ways an agent can find and use the printer.
 
-**MCP server.** shortorder exposes the printer as [Model Context Protocol](https://modelcontextprotocol.io) tools: `list_printers`, `print_text`, `print_qr`, `print_barcode`, `print_image`, and `cut`. An MCP-aware agent gets the tool schemas automatically. Two transports are supported.
+**MCP server.** shortorder exposes the printer as [Model Context Protocol](https://modelcontextprotocol.io) tools: `list_printers`, `print_text`, `print_document`, `print_qr`, `print_barcode`, `print_svg`, `print_image`, and `cut`. An MCP-aware agent gets the tool schemas automatically. Two transports are supported.
+
+`print_document` is the one to reach for to lay out a whole receipt — header, an itemized table with prices flush-right, rules, totals, a barcode/QR, footer — in a single job using the printer's crisp native text. `print_svg` is the escape hatch for any layout the character grid can't express (logos, free positioning, shapes), rendered to a raster with fonts bundled in the binary.
 
 stdio, for agents that launch a tool as a subprocess:
 
@@ -129,6 +131,27 @@ curl -X POST http://localhost/api/print/text \
   -H 'Content-Type: application/json' \
   -d '{"text":"ORDER #42","align":"center","bold":true,"cut":true}'
 
+# A whole receipt in one job: header, itemized table, total, then cut
+curl -X POST http://localhost/api/print/document \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "elements": [
+      {"type":"text","text":"SHORT ORDER","align":"center","bold":true,"width":2,"height":2},
+      {"type":"rule"},
+      {"type":"table",
+       "columns":[{"width":3},{"width":0},{"width":8,"align":"right"}],
+       "rows":[["2","Coffee","$6.00"],["1","Muffin","$3.25"]]},
+      {"type":"rule","char":"="},
+      {"type":"row","left":"TOTAL","right":"$9.25","bold":true}
+    ],
+    "cut": true
+  }'
+
+# Arbitrary layout via SVG (logos, shapes, free positioning)
+curl -X POST http://localhost/api/print/svg \
+  -H 'Content-Type: application/json' \
+  -d '{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"384\" height=\"80\" viewBox=\"0 0 384 80\"><rect width=\"384\" height=\"80\" fill=\"white\"/><text x=\"192\" y=\"54\" font-family=\"sans-serif\" font-size=\"40\" text-anchor=\"middle\">SHORT ORDER</text></svg>"}'
+
 # A QR code with a caption
 curl -X POST http://localhost/api/print/qr \
   -H 'Content-Type: application/json' \
@@ -183,8 +206,10 @@ and binds it directly). On Windows it defaults to 8080 to avoid the common
 | `GET  /healthz`         | Liveness and version                          |
 | `GET  /api/printers`    | List supported models and detected devices    |
 | `POST /api/print/text`  | Print formatted text                          |
+| `POST /api/print/document` | Lay out a whole receipt (text, rows, tables, rules, codes) in one job |
 | `POST /api/print/qr`    | Render and print a QR code                     |
 | `POST /api/print/barcode` | Render and print a 1D/2D barcode (incl. DataMatrix, PDF417) |
+| `POST /api/print/svg`   | Render arbitrary SVG markup to a raster and print it |
 | `POST /api/print/image` | Print a PNG/JPEG/GIF as a dithered raster      |
 | `POST /api/print/raw`   | Send a raw ESC/POS byte stream                 |
 | `POST /api/cut`         | Feed and cut                                   |
@@ -235,9 +260,15 @@ printer's USB device, with no spooler, print queue, or driver install:
 - On Linux and the Raspberry Pi, it finds the printer in `sysfs`, matches its USB
   VID/PID against the allowlist, and writes to its `usblp` node (`/dev/usb/lp0`).
 
-QR codes, barcodes, and images are rendered to a 1-bit raster (Floyd-Steinberg dithered for
+Text and full receipt layouts (`/api/print/document`) are composed from the
+printer's native font over a fixed character grid — rows, tables, and rules laid
+out in code — so they print crisp and small. QR codes, barcodes, images, and SVG
+(`/api/print/svg`) are rendered to a 1-bit raster (Floyd-Steinberg dithered for
 photos and grayscale) and sent with the `GS v 0` raster command, so output is
-the same across printers regardless of their native graphics support.
+the same across printers regardless of their native graphics support. SVG is
+rendered by a pure-Go engine with fonts bundled into the binary (Roboto, Gelasio,
+Go Mono), so text renders identically on every host with no system fonts
+installed.
 
 ## Logging
 
@@ -270,3 +301,7 @@ make tag V=v0.1.0   # tag + push, CI cuts a GitHub release
 ## License
 
 [Apache 2.0](LICENSE). Contributions and new printer models welcome.
+
+The SVG renderer bundles the Roboto and Gelasio fonts, both under the
+[SIL Open Font License](https://openfontlicense.org) (license texts in
+[`internal/escpos/fonts/`](internal/escpos/fonts/)).
