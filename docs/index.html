@@ -53,7 +53,7 @@
       </button>
       <a class="btn btn-ghost" href="https://github.com/aphexddb/shortorder" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
-        Star on GitHub
+        <span class="btn-label">Star on GitHub</span>
       </a>
     </div>
   </div>
@@ -233,67 +233,6 @@
       </div>
     </div>
 
-    <div class="tryit-grid" style="margin-top:26px">
-      <div class="codeblock reveal">
-        <div class="code-tabs">
-          <button class="code-tab active" data-tab="stdio">MCP · stdio</button>
-          <button class="code-tab" data-tab="http">MCP · HTTP</button>
-          <button class="code-tab" data-tab="openapi">OpenAPI</button>
-          <button class="code-tab" data-tab="mdns">mDNS</button>
-        </div>
-        <div class="code-body">
-          <button class="copy-btn" data-copy="self-prev">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span class="copy-label">copy</span>
-          </button>
-          <div class="code-pane active" data-pane="stdio">
-<pre class="code-pre"><span class="c-comment">// claude_desktop_config.json — or any MCP client</span>
-{
-  <span class="c-key">"mcpServers"</span>: {
-    <span class="c-key">"shortorder"</span>: {
-      <span class="c-key">"command"</span>: <span class="c-str">"shortorder"</span>,
-      <span class="c-key">"args"</span>: [<span class="c-str">"mcp"</span>]
-    }
-  }
-}</pre>
-          </div>
-          <div class="code-pane" data-pane="http">
-<pre class="code-pre"><span class="c-comment"># HTTP streamable transport — live whenever the service runs</span>
-<span class="c-method">POST</span> <span class="c-url">http://localhost/mcp</span>
-
-<span class="c-comment"># tools advertised to the agent:</span>
-list_printers   print_text     print_document
-print_qr        print_barcode  print_svg
-print_image     cut</pre>
-          </div>
-          <div class="code-pane" data-pane="openapi">
-<pre class="code-pre"><span class="c-comment"># OpenAPI 3.1 descriptor for function-calling agents</span>
-<span class="c-method">GET</span> <span class="c-url">http://localhost/openapi.json</span>
-<span class="c-method">GET</span> <span class="c-url">http://localhost/.well-known/openapi.json</span></pre>
-          </div>
-          <div class="code-pane" data-pane="mdns">
-<pre class="code-pre"><span class="c-comment"># the service advertises itself on the local network</span>
-<span class="c-method">$</span> dns-sd -B <span class="c-str">_shortorder._tcp</span>
-<span class="c-method">$</span> avahi-browse <span class="c-str">_shortorder._tcp</span>
-
-<span class="c-comment"># TXT records: version · path · api · mcp · openapi</span></pre>
-          </div>
-        </div>
-      </div>
-      <div>
-        <p style="color:var(--text-dim); font-size:14.5px; margin:0 0 14px; line-height:1.6;">Reach for <span class="mono accent-text">print_document</span> to lay out a whole receipt — header, itemized table, totals, a code, footer — in one job using the printer's crisp native text. <span class="mono accent-text">print_svg</span> is the escape hatch for anything the character grid can't express.</p>
-        <div class="chips" style="margin-top:0">
-          <span class="chip"><span class="c-mark">›</span> list_printers</span>
-          <span class="chip"><span class="c-mark">›</span> print_text</span>
-          <span class="chip"><span class="c-mark">›</span> print_document</span>
-          <span class="chip"><span class="c-mark">›</span> print_qr</span>
-          <span class="chip"><span class="c-mark">›</span> print_barcode</span>
-          <span class="chip"><span class="c-mark">›</span> print_svg</span>
-          <span class="chip"><span class="c-mark">›</span> print_image</span>
-          <span class="chip"><span class="c-mark">›</span> cut</span>
-        </div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -432,23 +371,6 @@ print_image     cut</pre>
       </div>
     </div>
 
-    <div class="split-paths">
-      <div class="path reveal">
-        <h4>Native text grid <span class="tag">crisp · small</span></h4>
-        <ul>
-          <li>Text and full layouts via <code>/api/print/document</code> — rows, tables and rules over a fixed character grid.</li>
-          <li>Composed in code from the printer's native font, so it prints sharp and tiny.</li>
-        </ul>
-      </div>
-      <div class="path reveal">
-        <h4>1-bit raster <span class="tag">universal</span></h4>
-        <ul>
-          <li>QR, barcodes, images and <code>/api/print/svg</code> rendered to a 1-bit raster (Floyd–Steinberg dithered).</li>
-          <li>SVG drawn by a pure-Go engine with fonts bundled in the binary — identical on every host, no system fonts needed.</li>
-        </ul>
-      </div>
-    </div>
-
     <div class="card-grid cols-2" style="margin-top:18px">
       <div class="card reveal">
         <div class="ci">
@@ -478,7 +400,7 @@ print_image     cut</pre>
       <h2>Most cheap USB receipt printers just work.</h2>
       <p>It's a REST and MCP interface to an ESC/POS USB printer. If yours is Epson-compatible, you're already most of the way there.</p>
     </div>
-    <div class="card reveal" style="padding:6px 8px">
+    <div class="card reveal hw-card" style="padding:6px 8px">
       <table class="hw-table">
         <thead>
           <tr><th>Printer</th><th>Interface</th><th>Status</th></tr>
@@ -579,7 +501,7 @@ print_image     cut</pre>
 <section id="contribute">
   <div class="wrap">
     <div class="contribute reveal">
-      <div class="contribute-grid">
+      <div class="contribute-grid" style="grid-template-columns:1fr">
         <div>
           <div class="eyebrow">Open source</div>
           <h2 style="margin-top:12px">Contributions &amp; new printer models welcome.</h2>
@@ -592,12 +514,6 @@ print_image     cut</pre>
             <a class="btn btn-ghost" href="https://github.com/aphexddb/shortorder/issues" target="_blank" rel="noopener">Open an issue</a>
             <a class="btn btn-ghost" href="https://github.com/aphexddb/shortorder/blob/main/docs/API.md" target="_blank" rel="noopener">Read the docs</a>
           </div>
-        </div>
-        <div class="cstats">
-          <div class="cstat"><div class="num">1</div><div class="lab">static Go binary</div></div>
-          <div class="cstat"><div class="num">0</div><div class="lab">drivers required</div></div>
-          <div class="cstat"><div class="num">3</div><div class="lab">platforms · Win/Linux/Pi</div></div>
-          <div class="cstat"><div class="num">8</div><div class="lab">MCP tools out of the box</div></div>
         </div>
       </div>
     </div>

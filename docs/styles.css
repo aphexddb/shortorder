@@ -198,7 +198,13 @@ section { padding: 92px 0; position: relative; }
   font-family: var(--font-mono); font-size: 14px;
   background: var(--surface); border: 1px solid var(--border-2);
   padding: 11px 11px 11px 16px; border-radius: 11px; color: var(--text);
+  max-width: 100%;
 }
+.cmd-chip > span {
+  min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none;
+}
+.cmd-chip > span::-webkit-scrollbar { display: none; }
+.cmd-chip .copy-mini { flex: none; }
 .cmd-chip .prompt { color: var(--accent); }
 .cmd-chip .copy-mini {
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim);
@@ -231,6 +237,7 @@ section { padding: 92px 0; position: relative; }
   color: var(--ink);
   font-family: var(--font-mono);
   width: 340px;
+  max-width: 100%;
   position: relative;
   box-shadow: var(--shadow-2);
   filter: drop-shadow(0 2px 0 rgba(0,0,0,.04));
@@ -274,7 +281,7 @@ section { padding: 92px 0; position: relative; }
 /* ============================================================
    PRINTER + animated print demo (hero A)
    ============================================================ */
-.printer-rig { position: relative; width: 360px; margin: 0 auto; }
+.printer-rig { position: relative; width: min(360px, 100%); margin: 0 auto; }
 .printer {
   position: relative; z-index: 3;
   background: linear-gradient(180deg, var(--surface-3), var(--surface));
@@ -294,14 +301,32 @@ section { padding: 92px 0; position: relative; }
   box-shadow: inset 0 3px 6px rgba(0,0,0,.6);
   position: relative;
 }
-/* receipt feeding out from behind the printer */
+/* receipt feeding out of the slot.
+   The feed area is clipped at its top edge (the slot line); the paper itself
+   starts translated 100% up — i.e. still inside the printer — and is fed
+   downward. Content moves WITH the paper, so each line emerges at the slot
+   and travels down, like a real thermal printer. Negative side/bottom insets
+   on the clip let the paper's box-shadow breathe. */
 .print-feed {
   position: absolute; left: 50%; transform: translateX(-50%);
-  top: calc(100% - 8px); width: 300px; z-index: 1;
+  /* slot spans 14–28px above the printer's bottom edge (14px bottom padding
+     + 14px slot height); the clip line sits at calc(100% - 24px), just below
+     the slot's top lip, so a sliver of dark recess stays visible above the
+     paper. z-index 4 > printer's 3: the paper drapes over the lower bezel. */
+  top: calc(100% - 24px); width: min(300px, 100%); z-index: 4;
   display: flex; justify-content: center;
+  clip-path: inset(0 -80px -120px);
+}
+/* dark slot recess swallowing the paper at the exit line */
+.print-feed::after {
+  content: ""; position: absolute; top: 0; left: 50%;
+  width: 280px; max-width: 100%; height: 24px;
+  transform: translateX(-50%); pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.18) 45%, rgba(0,0,0,0));
+  animation: shade-in .4s linear 1s both;
 }
 .feed-paper {
-  width: 280px; background: var(--paper); color: var(--ink);
+  width: 280px; max-width: 100%; background: var(--paper); color: var(--ink);
   font-family: var(--font-mono); padding: 20px 22px 26px;
   box-shadow: var(--shadow-2);
   -webkit-mask:
@@ -310,7 +335,42 @@ section { padding: 92px 0; position: relative; }
           mask:
     linear-gradient(#000 0 0) top/100% calc(100% - 11px) no-repeat,
     radial-gradient(circle at 8px 11px, #0000 8px, #000 8.5px) bottom left / 16px 11px repeat-x;
+  will-change: transform;
+  /* steps() = universal ratchety line-feed fallback */
+  animation: feed-out 3.6s steps(36, end) .8s both;
 }
+/* burst-and-pause feed profile where linear() easing is supported —
+   short advances with brief stops, like the head printing block by block */
+@supports (animation-timing-function: linear(0, 1)) {
+  .feed-paper {
+    animation-timing-function: linear(
+      0, 0.02 4%,
+      0.10 12%, 0.10 15%,
+      0.18 22%, 0.18 25%,
+      0.28 33%, 0.28 35%,
+      0.40 44%, 0.40 47%,
+      0.55 58%, 0.55 60%,
+      0.68 68%, 0.68 71%,
+      0.82 80%, 0.82 83%,
+      0.94 91%, 0.94 94%,
+      1
+    );
+  }
+}
+@keyframes feed-out {
+  /* extra 80px keeps the downward box-shadow from peeking past the slot */
+  from { transform: translateY(calc(-100% - 80px)); }
+  to   { transform: translateY(0); }
+}
+@keyframes shade-in { from { opacity: 0; } }
+/* print-head buzz on the printer body while feeding */
+.heroA-grid .printer { animation: head-buzz .13s linear .8s 27; }
+@keyframes head-buzz { 50% { transform: translateY(.6px); } }
+/* LED: rapid busy flicker during the print, then settle into idle blink */
+.heroA-grid .printer-top .led {
+  animation: led-busy .26s linear .8s 14, blink 2.4s linear 4.6s infinite;
+}
+@keyframes led-busy { 50% { opacity: .25; } }
 
 /* ============================================================
    AGENT FLOW (hero C) + diagram cards
@@ -397,6 +457,11 @@ section { padding: 92px 0; position: relative; }
 
 /* try-it split: code + mini receipt preview */
 .tryit-grid { display: grid; grid-template-columns: 1.55fr .9fr; gap: 26px; align-items: start; }
+
+/* Let grid columns shrink below their content width so the code blocks'
+   own overflow-x scrolls instead of stretching the page (min-width:auto
+   blowout). Without this, a long <pre> line forces horizontal page overflow. */
+.heroA-grid > *, .heroC-grid > *, .tryit-grid > *, .install-grid > * { min-width: 0; }
 .tryit-preview {
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   background: var(--surface-2); border: 1px dashed var(--border-2); border-radius: var(--radius); padding: 30px 22px;
@@ -439,7 +504,9 @@ section { padding: 92px 0; position: relative; }
 /* ============================================================
    HARDWARE table
    ============================================================ */
-.hw-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+/* the table can be wider than a phone — let its card scroll so no column is clipped */
+.hw-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hw-table { width: 100%; min-width: 360px; border-collapse: collapse; font-size: 14.5px; }
 .hw-table th, .hw-table td { text-align: left; padding: 15px 16px; border-bottom: 1px solid var(--border); }
 .hw-table th { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
 .hw-table tr:last-child td { border-bottom: none; }
@@ -530,12 +597,63 @@ section { padding: 92px 0; position: relative; }
   .cols-3, .cols-2, .pipeline, .split-paths { grid-template-columns: 1fr; }
   .nav-links { display: none; }
   .heroA-grid .printer-rig, .heroC-grid > div:last-child { margin-top: 18px; }
+
+  /* stacked hero: keep the print-feed in normal flow (so it reserves space
+     and no longer hangs over the next section), but tuck it BEHIND the
+     printer with a lower z-index so the paper emerges from the slot.
+     The large negative margin pulls the paper's top up past the slot;
+     the extra top padding keeps the receipt content from hiding behind it. */
+  .print-feed {
+    position: relative; z-index: 4; left: auto; transform: none;
+    /* container top = the slot exit line, 24px above the printer's bottom
+       edge — same geometry as desktop, paper above the lower bezel */
+    margin: -24px auto 0;
+  }
+  .feed-paper { padding-top: 44px; }
+
+  /* center the split hero once it stacks, matching the other hero variants */
+  .heroA-grid { text-align: center; gap: 32px; }
+  .heroA-grid .hero-sub { margin-left: auto; margin-right: auto; }
+  .heroA-grid .hero-cta { justify-content: center; }
+
   .footer-grid { grid-template-columns: 1fr 1fr; }
   section { padding: 66px 0; }
+  .hero { padding: 48px 0 60px; }
   .contribute { padding: 36px 26px; }
+
+  /* stacked pipeline: arrows point down, sitting in the gap between steps */
+  .pipeline { gap: 30px; }
+  .pipe-step .pipe-arrow {
+    right: 50%; top: auto; bottom: -25px;
+    transform: translateX(50%) rotate(90deg);
+  }
 }
 @media (max-width: 560px) {
   .footer-grid { grid-template-columns: 1fr; }
-  .wrap { padding: 0 20px; }
-  .nav-inner { padding: 0 18px; }
+  .wrap { padding: 0 18px; }
+  .nav-inner { padding: 0 16px; gap: 12px; }
+
+  /* nav: collapse the GitHub button to an icon so it fits */
+  .nav-right { gap: 8px; }
+  .nav-right .btn-ghost .btn-label { display: none; }
+  .nav-right .btn-ghost { padding: 10px; }
+  .nav-right .btn-ghost svg { width: 18px; height: 18px; }
+  .ver-pill { display: none; }
+
+  section { padding: 56px 0; }
+  .section-head { margin-bottom: 34px; }
+  .section-head p { font-size: 16px; }
+
+  .hero-cta { gap: 10px; }
+  .cmd-chip { width: 100%; }
+
+  .card { padding: 22px; }
+  .contribute { padding: 30px 22px; }
+  .cstats { grid-template-columns: 1fr 1fr; }
+
+  /* the install note shares space with the floating copy button on desktop;
+     drop the big right gutter once it's stacked on its own row */
+  .install-note { padding: 18px 18px 0; }
+
+  .footer-bottom { flex-direction: column; gap: 8px; }
 }
