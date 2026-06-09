@@ -199,3 +199,13 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+--------------------------------------------------------------------------------
+Bundled Third-Party Components
+--------------------------------------------------------------------------------
+
+This product bundles Roboto, which is available under the SIL Open Font License,
+Version 1.1. For details, see internal/escpos/fonts/Roboto-OFL.txt.
+
+This product bundles Gelasio, which is available under the SIL Open Font License,
+Version 1.1. For details, see internal/escpos/fonts/Gelasio-OFL.txt.
