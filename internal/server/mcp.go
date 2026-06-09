@@ -25,6 +25,8 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 		"shortorder",
 		s.cfg.Version,
 		mcpserver.WithToolCapabilities(true),
+		mcpserver.WithResourceCapabilities(false, false),
+		mcpserver.WithPromptCapabilities(false),
 		mcpserver.WithInstructions(
 			"shortorder prints to an Epson-compatible ESC/POS USB thermal receipt printer. "+
 				"Call list_printers to confirm a device is connected, then use "+
@@ -33,7 +35,11 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 				"flush-right, rules, totals, codes, footer) in one job, prefer print_document. "+
 				"For crisp receipt text prefer native text (print_text / print_document) over "+
 				"embedding text in an image. To print a layout the character grid can't express "+
-				"(custom fonts, logos, free positioning, shapes), render it as SVG and use print_svg.",
+				"(custom fonts, logos, free positioning, shapes), render it as SVG and use print_svg. "+
+				"Read the `shortorder://capabilities` resource for machine-readable limits "+
+				"(head width, supported barcode formats, fonts). "+
+				"The `receipt`, `logo_header`, and `loyalty_qr` prompts provide ready-made, "+
+				"copy-pasteable payload templates for these common jobs.",
 		),
 	)
 
@@ -146,6 +152,38 @@ func (s *Server) MCPServer() *mcpserver.MCPServer {
 	m.AddTool(mcp.NewTool("cut",
 		mcp.WithDescription("Feed a few lines clear of the head and perform a partial cut."),
 	), s.mcpCut)
+
+	// A single static resource that publishes the printer's capabilities as
+	// machine-readable JSON so agents can discover limits (head width, barcode
+	// formats, fonts, image formats, detected device) without parsing prose.
+	m.AddResource(mcp.NewResource(
+		"shortorder://capabilities",
+		"capabilities",
+		mcp.WithResourceDescription("Machine-readable printer capabilities: head width and columns, "+
+			"supported/detected devices, barcode formats, QR recovery levels, SVG fonts and caveats, "+
+			"image formats, and text size ranges."),
+		mcp.WithMIMEType("application/json"),
+	), s.mcpCapabilities)
+
+	// Prompts: reusable payload templates an agent can list and expand. They
+	// complement the print_sample_* tools (which print) by teaching the agent
+	// how to AUTHOR a payload for the common "what's possible" jobs.
+	m.AddPrompt(mcp.NewPrompt("receipt",
+		mcp.WithPromptDescription("Lay out a complete itemized receipt."),
+		mcp.WithArgument("store", mcp.ArgumentDescription("Store / header name printed at the top (default ACME CAFE).")),
+		mcp.WithArgument("items", mcp.ArgumentDescription("Free-text description of the line items to fill into the table.")),
+	), s.mcpPromptReceipt)
+
+	m.AddPrompt(mcp.NewPrompt("logo_header",
+		mcp.WithPromptDescription("Print a centered logo/wordmark header with SVG."),
+		mcp.WithArgument("name", mcp.ArgumentDescription("The wordmark text to center in the header (default SHORT ORDER).")),
+	), s.mcpPromptLogoHeader)
+
+	m.AddPrompt(mcp.NewPrompt("loyalty_qr",
+		mcp.WithPromptDescription("Print a scannable QR with a caption."),
+		mcp.WithArgument("url", mcp.ArgumentDescription("The link to encode in the QR code (default https://example.com).")),
+		mcp.WithArgument("caption", mcp.ArgumentDescription("Text printed under the QR code (default Scan me).")),
+	), s.mcpPromptLoyaltyQR)
 
 	return m
 }
@@ -507,6 +545,193 @@ func (s *Server) mcpPrintSampleSVG(ctx context.Context, req mcp.CallToolRequest)
 
 func (s *Server) mcpCut(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return s.mcpPrint("shortorder-cut", escpos.New().Cut().Bytes())
+}
+
+// ---- resource handlers ---------------------------------------------------
+
+// mcpCapabilities serves the shortorder://capabilities resource: a single JSON
+// object describing what this printer can do (head geometry, supported/detected
+// devices, barcode/QR/SVG/image/text limits). Values are pulled from the same
+// sources the tools use so the resource never drifts from real behavior.
+func (s *Server) mcpCapabilities(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	// Columns derive from head width exactly as buildDocument does (dots/12:
+	// 576 dots -> 48 cols for 80mm, 384 dots -> 32 cols for 58mm).
+	cols := escpos.Cols(s.cfg.Width)
+	// Cols(dots) crosses from 32 to 48 columns around 512 dots, the same
+	// threshold that distinguishes a 58mm head from an 80mm head.
+	widthMm := 58
+	if s.cfg.Width >= 512 {
+		widthMm = 80
+	}
+
+	// Detect() is best-effort: an agent reading capabilities with no printer
+	// plugged in should still get the static facts, so swallow the error and
+	// report an empty detected list rather than failing the resource.
+	detected, _ := printer.Detect()
+	if detected == nil {
+		detected = []printer.Info{}
+	}
+
+	caps := map[string]any{
+		"head": map[string]any{
+			"widthDots": s.cfg.Width,
+			"columns":   cols,
+			"widthMm":   widthMm,
+		},
+		"device": map[string]any{
+			"supported": printer.SupportedModels(),
+			"detected":  detected,
+		},
+		"barcode": map[string]any{
+			"formats": escpos.BarcodeFormats,
+			"twoD":    []string{"datamatrix", "pdf417"},
+			"hri":     "human-readable number can be printed under 1D codes, grouped per symbology",
+		},
+		"qr": map[string]any{
+			"recovery":     []string{"low", "medium", "high", "highest"},
+			"defaultScale": 8,
+		},
+		"svg": map[string]any{
+			"fonts": []map[string]any{
+				{"name": "Roboto", "family": "sans-serif"},
+				{"name": "Gelasio", "family": "serif"},
+				{"name": "Go Mono", "family": "monospace"},
+			},
+			"raster": "1-bit Floyd–Steinberg dithered",
+			"caveats": []string{
+				"font-weight/font-style not differentiated — use print_text/print_document for genuine bold",
+			},
+		},
+		"image": map[string]any{
+			"formats":   []string{"png", "jpeg", "gif"},
+			"rendering": "dithered, scaled to fit head",
+		},
+		"text": map[string]any{
+			"sizeRange": map[string]any{"min": 1, "max": 8},
+			"underline": []int{0, 1, 2},
+		},
+	}
+
+	data, err := json.Marshal(caps)
+	if err != nil {
+		return nil, err
+	}
+	return []mcp.ResourceContents{
+		mcp.TextResourceContents{
+			URI:      "shortorder://capabilities",
+			MIMEType: "application/json",
+			Text:     string(data),
+		},
+	}, nil
+}
+
+// ---- prompt handlers -----------------------------------------------------
+
+// mcpPromptReceipt expands the `receipt` prompt: a guide plus a concrete,
+// copy-pasteable print_document payload that lays out a full itemized receipt.
+func (s *Server) mcpPromptReceipt(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	store := req.Params.Arguments["store"]
+	if store == "" {
+		store = "ACME CAFE"
+	}
+	items := req.Params.Arguments["items"]
+	if items == "" {
+		items = "(describe the line items here; one table row per item: quantity, name, price)"
+	}
+
+	text := "Lay out a complete itemized receipt by calling the `print_document` tool. " +
+		"Pass an ordered `elements` array; column-aware elements (row, table, rule) are accurate " +
+		"at the default text size, so only enlarge text for centered headers.\n\n" +
+		"Header: `" + store + "`. Line items to fill into the table rows below: " + items + "\n\n" +
+		"Replace the example rows with your items (each row is [quantity, name, price]), recompute " +
+		"the TOTAL, and set the barcode `data` to your order id. Example `print_document` arguments:\n\n" +
+		"```json\n" +
+		"{\n" +
+		"  \"elements\": [\n" +
+		"    { \"type\": \"text\", \"text\": \"" + store + "\", \"align\": \"center\", \"bold\": true, \"width\": 2, \"height\": 2 },\n" +
+		"    { \"type\": \"text\", \"text\": \"123 Main St\", \"align\": \"center\" },\n" +
+		"    { \"type\": \"rule\", \"char\": \"=\" },\n" +
+		"    { \"type\": \"row\", \"left\": \"Order #1042\", \"right\": \"2026-06-08 14:32\" },\n" +
+		"    { \"type\": \"rule\" },\n" +
+		"    { \"type\": \"table\",\n" +
+		"      \"columns\": [ { \"width\": 3, \"align\": \"left\" }, { \"width\": 0, \"align\": \"left\" }, { \"width\": 9, \"align\": \"right\" } ],\n" +
+		"      \"rows\": [\n" +
+		"        [ \"2\", \"Cappuccino\", \"$9.00\" ],\n" +
+		"        [ \"1\", \"Avocado Toast\", \"$12.50\" ],\n" +
+		"        [ \"3\", \"Drip Coffee\", \"$7.50\" ]\n" +
+		"      ]\n" +
+		"    },\n" +
+		"    { \"type\": \"rule\" },\n" +
+		"    { \"type\": \"row\", \"left\": \"Subtotal\", \"right\": \"$29.00\" },\n" +
+		"    { \"type\": \"row\", \"left\": \"Tax\", \"right\": \"$2.68\" },\n" +
+		"    { \"type\": \"rule\", \"char\": \"=\" },\n" +
+		"    { \"type\": \"row\", \"left\": \"TOTAL\", \"right\": \"$31.68\", \"bold\": true },\n" +
+		"    { \"type\": \"feed\", \"lines\": 1 },\n" +
+		"    { \"type\": \"barcode\", \"format\": \"code128\", \"data\": \"ORD-2026-1042\", \"hri\": true, \"align\": \"center\" },\n" +
+		"    { \"type\": \"feed\", \"lines\": 1 },\n" +
+		"    { \"type\": \"text\", \"text\": \"Thank you for dining with us!\", \"align\": \"center\" }\n" +
+		"  ],\n" +
+		"  \"cut\": true\n" +
+		"}\n" +
+		"```"
+
+	return mcp.NewGetPromptResult(
+		"A print_document payload template for a full itemized receipt.",
+		[]mcp.PromptMessage{mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(text))},
+	), nil
+}
+
+// mcpPromptLogoHeader expands the `logo_header` prompt: a guide plus a concrete
+// print_svg payload that centers a wordmark over a white background.
+func (s *Server) mcpPromptLogoHeader(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	name := req.Params.Arguments["name"]
+	if name == "" {
+		name = "SHORT ORDER"
+	}
+
+	svg := `<svg xmlns="http://www.w3.org/2000/svg" width="384" height="120" viewBox="0 0 384 120">` +
+		`<rect width="384" height="120" fill="white"/>` +
+		`<text x="192" y="78" font-family="serif" font-size="48" text-anchor="middle">` + name + `</text>` +
+		`</svg>`
+
+	text := "Print a centered logo/wordmark header by calling the `print_svg` tool. SVG is the escape " +
+		"hatch for layout the character grid can't express (custom fonts, free positioning, shapes); for " +
+		"genuinely bold body text, `print_document` is crisper.\n\n" +
+		"Pass this as the `svg` argument (it centers \"" + name + "\" over a white background):\n\n" +
+		"```xml\n" + svg + "\n```"
+
+	return mcp.NewGetPromptResult(
+		"A print_svg payload template for a centered wordmark header.",
+		[]mcp.PromptMessage{mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(text))},
+	), nil
+}
+
+// mcpPromptLoyaltyQR expands the `loyalty_qr` prompt: a guide plus the minimal
+// print_qr argument shape for a scannable QR with a caption.
+func (s *Server) mcpPromptLoyaltyQR(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	url := req.Params.Arguments["url"]
+	if url == "" {
+		url = "https://example.com"
+	}
+	caption := req.Params.Arguments["caption"]
+	if caption == "" {
+		caption = "Scan me"
+	}
+
+	text := "Print a scannable QR with a caption by calling the `print_qr` tool. The minimal arguments " +
+		"are `data` (the link to encode) and `caption`; `scale`, `recovery`, and `align` are optional.\n\n" +
+		"```json\n" +
+		"{\n" +
+		"  \"data\": \"" + url + "\",\n" +
+		"  \"caption\": \"" + caption + "\",\n" +
+		"  \"align\": \"center\"\n" +
+		"}\n" +
+		"```"
+
+	return mcp.NewGetPromptResult(
+		"A print_qr payload template for a captioned, scannable QR code.",
+		[]mcp.PromptMessage{mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(text))},
+	), nil
 }
 
 // mcpPrint sends an ESC/POS stream and returns a tool result describing the

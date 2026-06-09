@@ -354,15 +354,78 @@ tool loaders. The `servers[0].url` is filled in from the request host.
 A [Model Context Protocol](https://modelcontextprotocol.io) server over the HTTP
 streamable transport (stateless). Exposes the tools `list_printers`,
 `print_text`, `print_document`, `print_svg`, `print_qr`, `print_barcode`,
-`print_image`, and `cut`, mirroring the REST API. `print_text` takes `text` with the flat style fields for uniform
+`print_image`, and `cut`, mirroring the REST API, plus a machine-readable
+**capabilities resource** and a set of **prompts** for common jobs.
+`print_text` takes `text` with the flat style fields for uniform
 styling, or an optional `lines` array (each item a styled segment) to mix
-alignment, sizes, and emphasis line by line. Example (JSON-RPC):
+alignment, sizes, and emphasis line by line. List the tools (JSON-RPC):
 
 ```sh
 curl -X POST http://127.0.0.1:8080/mcp \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+#### Capabilities resource
+
+A single static resource at URI `shortorder://capabilities` (MIME
+`application/json`) publishes the printer's limits and capabilities as
+machine-readable JSON, so an agent can discover *what is possible* without
+parsing prose. Clients enumerate it with `resources/list` and fetch it with
+`resources/read`. The returned object has these top-level keys:
+
+- `head` — `widthDots`, `columns`, and `widthMm` derived from the configured
+  head width (80mm head = 576 dots / 48 columns; 58mm head = 384 dots / 32
+  columns).
+- `device` — `supported` (model names this build knows) and `detected`
+  (printers found on the machine; empty when none is plugged in).
+- `barcode` — `formats` (all 1D symbologies), `twoD` (`datamatrix`, `pdf417`),
+  and an `hri` note on human-readable text.
+- `qr` — `recovery` (`low`, `medium`, `high`, `highest`) and `defaultScale`.
+- `svg` — `fonts` (Roboto / Gelasio / Go Mono with their families), `raster`
+  (the dithering used), and `caveats`.
+- `image` — `formats` (`png`, `jpeg`, `gif`) and a `rendering` note.
+- `text` — `sizeRange` (`min`/`max`) and the allowed `underline` values.
+
+```sh
+curl -X POST http://127.0.0.1:8080/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"shortorder://capabilities"}}'
+```
+
+The `text` of the returned resource content is a JSON object, trimmed here:
+
+```jsonc
+{
+  "head": { "widthDots": 576, "columns": 48, "widthMm": 80 },
+  "device": { "supported": ["..."], "detected": [] },
+  "barcode": { "formats": ["code128", "gs1-128", "..."], "twoD": ["datamatrix", "pdf417"], "hri": "..." },
+  "qr": { "recovery": ["low", "medium", "high", "highest"], "defaultScale": 8 },
+  "svg": { "fonts": [{ "name": "Roboto", "family": "sans-serif" }], "raster": "1-bit Floyd–Steinberg dithered", "caveats": ["..."] },
+  "image": { "formats": ["png", "jpeg", "gif"], "rendering": "dithered, scaled to fit head" },
+  "text": { "sizeRange": { "min": 1, "max": 8 }, "underline": [0, 1, 2] }
+}
+```
+
+#### Prompts
+
+Three prompt templates return ready-made, copy-pasteable payload guidance for
+common jobs. Clients enumerate them with `prompts/list` and expand them with
+`prompts/get`:
+
+- `receipt` — optional args `store`, `items` — a full itemized `print_document`
+  payload template.
+- `logo_header` — optional arg `name` — a centered SVG wordmark `print_svg`
+  template.
+- `loyalty_qr` — optional args `url`, `caption` — a `print_qr` template.
+
+```sh
+curl -X POST http://127.0.0.1:8080/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"receipt","arguments":{"store":"ACME CAFE"}}}'
 ```
 
 The same MCP server runs over **stdio** via `shortorder mcp`, for agents that
