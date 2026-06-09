@@ -8,6 +8,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const maxUSBWriteChunk = 16 * 1024
+
 // sendRaw opens the printer's USB device interface and writes the ESC/POS bytes
 // directly to it (CreateFile + WriteFile). No spooler queue is involved.
 func sendRaw(target Info, data []byte) error {
@@ -41,6 +43,9 @@ func sendRaw(target Info, data []byte) error {
 	for off := 0; off < len(data); {
 		var written uint32
 		chunk := data[off:]
+		if len(chunk) > maxUSBWriteChunk {
+			chunk = chunk[:maxUSBWriteChunk]
+		}
 		if err := windows.WriteFile(h, chunk, &written, nil); err != nil {
 			return fmt.Errorf("write to %s: %w", target.Name, err)
 		}
