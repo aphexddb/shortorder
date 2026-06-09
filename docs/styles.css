@@ -183,18 +183,10 @@ section { padding: 92px 0; position: relative; }
    HERO (shared)
    ============================================================ */
 .hero { padding: 70px 0 84px; }
-.hero-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
-.badge {
-  font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
-  padding: 5px 10px; border-radius: 7px; border: 1px solid var(--border);
-  color: var(--text-dim); background: var(--surface); display: inline-flex; gap: 6px; align-items: center;
-}
-.badge b { color: var(--text); font-weight: 700; }
-.badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 
 .hero h1 {
   font-size: clamp(38px, 6vw, 66px); line-height: 1.02; letter-spacing: -.035em;
-  margin-top: 22px;
+  margin-top: 0;
 }
 .hero h1 .pop { color: var(--accent); }
 .hero-sub { font-size: clamp(16px, 2vw, 19px); color: var(--text-dim); max-width: 560px; margin: 22px 0 0; line-height: 1.55; }
@@ -226,7 +218,6 @@ section { padding: 92px 0; position: relative; }
 .heroB { text-align: center; }
 .heroB .hero-sub { margin-left: auto; margin-right: auto; }
 .heroB .hero-cta { justify-content: center; }
-.heroB .hero-badges { justify-content: center; }
 .heroB-receipt-wrap { margin-top: 50px; display: flex; justify-content: center; }
 
 /* --- Hero C: agent flow --- */
@@ -277,7 +268,7 @@ section { padding: 92px 0; position: relative; }
   background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px, var(--ink) 4px 5px, transparent 5px 9px, var(--ink) 9px 12px, transparent 12px 14px);
 }
 .r-qr {
-  width: 92px; height: 92px; margin: 4px auto; image-rendering: pixelated;
+  width: 118px; height: 118px; margin: 6px auto; image-rendering: pixelated;
 }
 
 /* ============================================================
@@ -315,10 +306,10 @@ section { padding: 92px 0; position: relative; }
   box-shadow: var(--shadow-2);
   -webkit-mask:
     linear-gradient(#000 0 0) top/100% calc(100% - 11px) no-repeat,
-    radial-gradient(circle at 8px 3px, #0000 8px, #000 8.5px) bottom left / 16px 11px repeat-x;
+    radial-gradient(circle at 8px 11px, #0000 8px, #000 8.5px) bottom left / 16px 11px repeat-x;
           mask:
     linear-gradient(#000 0 0) top/100% calc(100% - 11px) no-repeat,
-    radial-gradient(circle at 8px 3px, #0000 8px, #000 8.5px) bottom left / 16px 11px repeat-x;
+    radial-gradient(circle at 8px 11px, #0000 8px, #000 8.5px) bottom left / 16px 11px repeat-x;
 }
 
 /* ============================================================
@@ -478,6 +469,14 @@ section { padding: 92px 0; position: relative; }
 .os-btn small { display: block; font-size: 11.5px; color: var(--text-faint); font-weight: 400; margin-top: 2px; }
 .install-pane { display: none; }
 .install-pane.active { display: block; }
+.install-note {
+  margin: 0; padding: 20px 112px 0 24px;
+  color: var(--text-dim); font-size: 14px; line-height: 1.5;
+}
+.install-note a { color: var(--accent); font-weight: 600; }
+.install-note a:hover { text-decoration: underline; }
+.install-note code { font-family: var(--font-mono); color: var(--text); }
+.install-note + .code-pre { padding-top: 12px; }
 
 /* ============================================================
    CONTRIBUTE

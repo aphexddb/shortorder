@@ -1,5 +1,7 @@
 # 🧾 shortorder
 
+[Website](https://shortorder.dev/) | [Install](https://shortorder.dev/#install) | [Releases](https://github.com/aphexddb/shortorder/releases/latest) | [API docs](docs/API.md)
+
 **A tiny service that prints to a USB thermal receipt printer.** 
 
 shortorder is an AI-enabled thermal receipt printer. It runs as a small HTTP service that lets AI agents (and ordinary scripts) print to a USB thermal printer. Send it a request and it prints text, full receipt layouts, QR codes, barcodes, images, or arbitrary SVG, then cuts the receipt.

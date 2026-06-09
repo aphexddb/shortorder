@@ -47,6 +47,27 @@
   }
   window.__setHero = setHero;
 
+  /* ---------- LATEST RELEASE ---------- */
+  function syncLatestRelease() {
+    var pills = document.querySelectorAll('[data-latest-release]');
+    if (!pills.length || !window.fetch) return;
+
+    fetch('https://api.github.com/repos/aphexddb/shortorder/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' }
+    })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (release) {
+        var tag = release && release.tag_name;
+        if (!tag) return;
+        pills.forEach(function (pill) {
+          pill.textContent = tag;
+          pill.setAttribute('title', 'Latest GitHub release: ' + tag);
+          pill.setAttribute('aria-label', 'Latest shortorder release: ' + tag);
+        });
+      })
+      .catch(function () {});
+  }
+
   /* ---------- CODE TABS ---------- */
   document.addEventListener('click', function (e) {
     var tab = e.target.closest('.code-tab');
@@ -132,7 +153,7 @@
     runPrint(feed);
   }
   function runPrint(feed) {
-    // measure full height then animate from 0 -> full, looping
+    // measure full height then animate from 0 -> full once
     feed.style.transition = 'none';
     feed.style.maxHeight = 'none';
     var full = feed.scrollHeight;
@@ -144,17 +165,11 @@
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { feed.style.maxHeight = full + 'px'; });
     });
-    printTimer = setTimeout(function () {
-      // pause showing the full receipt, then reset & replay
-      printTimer = setTimeout(function () {
-        if (!document.querySelector('.hero-stage.active .feed-paper')) return;
-        runPrint(feed);
-      }, 3200);
-    }, 2700);
   }
 
   /* ---------- BOOT ---------- */
   function boot() {
+    syncLatestRelease();
     observeReveals();
     // default hero if island hasn't set one yet
     if (!document.querySelector('.hero-stage.active')) setHero('split');
