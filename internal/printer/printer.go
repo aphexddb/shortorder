@@ -9,7 +9,10 @@
 // identifiers a device reports and a set of known name substrings.
 package printer
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
 // Info describes a detected, supported printer.
 type Info struct {
@@ -100,7 +103,14 @@ func Detect() ([]Info, error) {
 	return detect()
 }
 
+// printMu serializes jobs: concurrent writes to the same device interleave
+// their bytes mid-command and desync the printer.
+var printMu sync.Mutex
+
 // Print sends raw data (an ESC/POS stream) to the given detected printer.
+// Jobs are serialized; a call blocks while another print is in flight.
 func Print(target Info, data []byte) error {
+	printMu.Lock()
+	defer printMu.Unlock()
 	return sendRaw(target, data)
 }
